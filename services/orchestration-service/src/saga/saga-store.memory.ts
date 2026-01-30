@@ -9,7 +9,12 @@ export class InMemorySagaStore implements SagaStore {
     const now = new Date();
     const existing = this.sagas.get(saga.sagaId);
     if (existing) {
-      const updated: SagaRecord = { ...existing, status: saga.status, updatedAt: now };
+      const updated: SagaRecord = {
+        ...existing,
+        status: saga.status,
+        simulated: saga.simulated ?? existing.simulated,
+        updatedAt: now
+      };
       this.sagas.set(saga.sagaId, updated);
       return updated;
     }
@@ -18,6 +23,7 @@ export class InMemorySagaStore implements SagaStore {
       traceId: saga.traceId,
       sku: saga.sku,
       status: saga.status,
+      simulated: saga.simulated,
       createdAt: now,
       updatedAt: now
     };

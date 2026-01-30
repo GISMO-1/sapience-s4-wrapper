@@ -8,6 +8,7 @@ export type NewSaga = {
   traceId: string;
   sku: string;
   status: SagaStatus;
+  simulated?: boolean;
 };
 
 export type NewSagaEvent = {

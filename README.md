@@ -16,6 +16,19 @@ Once running:
 - Web portal: http://localhost:5173
 - API gateway: http://localhost:3000/health
 
+## Makefile shortcuts
+Purpose: provide consistent local dev commands for containers and tests. Inputs are local Docker and pnpm configuration; outputs are running containers, logs, or test results.
+
+Example command:
+```bash
+make up
+```
+
+Self-check:
+```bash
+make test
+```
+
 ## Endpoints and example curl commands
 ### API gateway intent routing
 ```bash

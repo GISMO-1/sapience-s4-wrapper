@@ -4,6 +4,7 @@ export type EventEnvelope<T> = {
   source: string;
   time: string;
   subject?: string;
-  traceId?: string;
+  traceId: string;
+  parentSpanId?: string;
   data: T;
 };

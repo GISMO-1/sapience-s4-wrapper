@@ -9,12 +9,17 @@ import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, TraceAwareRequest } from "./trace";
 
 const app = Fastify({ logger: false });
 
 async function start(): Promise<void> {
   await startTelemetry();
   await migrate();
+  app.addHook("onRequest", (request, reply, done) => {
+    ensureTraceId(request as TraceAwareRequest, reply);
+    done();
+  });
   await startProducer();
   await startConsumer();
 
@@ -22,7 +27,7 @@ async function start(): Promise<void> {
   await consumer.run({
     eachMessage: async ({ message }) => {
       if (!message.value) {
-        logger.warn("Received empty message");
+        logger.warn({ traceId: "system" }, "Received empty message");
         return;
       }
 
@@ -33,14 +38,19 @@ async function start(): Promise<void> {
           quantity: number;
           status: string;
         }>;
+        const traceId = payload.traceId ?? "unknown";
+        logger.info({ traceId, eventType: payload.type }, "Event consumed");
 
         await db.query(
           "INSERT INTO accruals (id, sku, quantity, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
           [payload.data.id, payload.data.sku, payload.data.quantity, "accrued"]
         );
-        logger.info({ purchaseOrderId: payload.data.id }, "Recorded accrual");
+        logger.info(
+          { purchaseOrderId: payload.data.id, traceId, eventType: payload.type },
+          "Recorded accrual"
+        );
       } catch (error) {
-        logger.error({ error }, "Failed to process PO completion event");
+        logger.error({ error, traceId: "system", eventType: topics.integrationPoCreated }, "Failed to process PO completion event");
       }
     }
   });
@@ -49,11 +59,11 @@ async function start(): Promise<void> {
   await registerRoutes(app);
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
-  logger.info({ port: config.port }, "Finance service listening");
+  logger.info({ port: config.port, traceId: "system" }, "Finance service listening");
 }
 
 async function shutdown(): Promise<void> {
-  logger.info("Shutting down finance service");
+  logger.info({ traceId: "system" }, "Shutting down finance service");
   await stopConsumer();
   await stopProducer();
   await db.end();
@@ -65,6 +75,6 @@ process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
 
 start().catch((error) => {
-  logger.error({ error }, "Failed to start finance service");
+  logger.error({ error, traceId: "system" }, "Failed to start finance service");
   process.exit(1);
 });

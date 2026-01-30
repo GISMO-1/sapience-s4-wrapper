@@ -13,3 +13,11 @@ export async function sendIntent(text: string) {
 
   return response.json();
 }
+
+export async function fetchTrace(traceId: string) {
+  const response = await fetch(`${API_BASE}/v1/explain/${encodeURIComponent(traceId)}`);
+  if (!response.ok) {
+    throw new Error("Trace lookup failed");
+  }
+  return response.json();
+}

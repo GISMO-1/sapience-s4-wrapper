@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { sendIntent } from "./api";
+import { fetchTrace, sendIntent } from "./api";
 
 export function App() {
   const [input, setInput] = useState("");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [traceId, setTraceId] = useState("");
+  const [traceResponse, setTraceResponse] = useState<string>("");
+  const [traceLoading, setTraceLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -20,6 +23,23 @@ export function App() {
       setResponse(JSON.stringify({ error: (error as Error).message }, null, 2));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTraceLookup = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!traceId.trim()) {
+      return;
+    }
+
+    setTraceLoading(true);
+    try {
+      const result = await fetchTrace(traceId.trim());
+      setTraceResponse(JSON.stringify(result, null, 2));
+    } catch (error) {
+      setTraceResponse(JSON.stringify({ error: (error as Error).message }, null, 2));
+    } finally {
+      setTraceLoading(false);
     }
   };
 
@@ -43,6 +63,22 @@ export function App() {
       <section className="response">
         <h2>Response</h2>
         <pre>{response || "No response yet."}</pre>
+      </section>
+      <section className="trace-viewer">
+        <h2>Trace Viewer</h2>
+        <p>Paste a trace ID to see the intent, saga timeline, and outcome.</p>
+        <form onSubmit={handleTraceLookup} className="chat-form">
+          <input
+            type="text"
+            value={traceId}
+            onChange={(event) => setTraceId(event.target.value)}
+            placeholder="Trace ID"
+          />
+          <button type="submit" disabled={traceLoading}>
+            {traceLoading ? "Loading..." : "Fetch trace"}
+          </button>
+        </form>
+        <pre>{traceResponse || "No trace loaded yet."}</pre>
       </section>
     </div>
   );

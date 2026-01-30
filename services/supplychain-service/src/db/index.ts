@@ -18,5 +18,5 @@ export async function migrate(): Promise<void> {
   const sqlPath = existsSync(distPath) ? distPath : srcPath;
   const sql = readFileSync(sqlPath, "utf8");
   await db.query(sql);
-  logger.info("Database migrations applied");
+  logger.info({ traceId: "system" }, "Database migrations applied");
 }

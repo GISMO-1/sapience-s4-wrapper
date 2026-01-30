@@ -16,6 +16,19 @@ Once running:
 - Web portal: http://localhost:5173
 - API gateway: http://localhost:3000/health
 
+## Makefile shortcuts
+Purpose: provide consistent local dev commands for containers and tests. Inputs are local Docker and pnpm configuration; outputs are running containers, logs, or test results.
+
+Example command:
+```bash
+make up
+```
+
+Self-check:
+```bash
+make test
+```
+
 ## Endpoints and example curl commands
 ### API gateway intent routing
 ```bash
@@ -23,6 +36,15 @@ curl -s -X POST http://localhost:3000/v1/intent \
   -H 'content-type: application/json' \
   -d '{"text":"create a PO for laptops"}' | jq
 ```
+
+### AI assist planner (gateway passthrough)
+```bash
+curl -s -X POST http://localhost:3000/v1/assist \
+  -H 'content-type: application/json' \
+  -d '{"text":"review invoice INV-2024"}' | jq
+```
+
+To execute the first tool call via the gateway, set `EXECUTION_MODE=auto` for the API gateway container.
 
 ### Procurement: request a purchase order
 ```bash
@@ -47,6 +69,23 @@ curl -s -X POST http://localhost:3003/v1/invoices/review-request \
 ```bash
 curl -s http://localhost:3004/v1/sap/purchase-orders/PO-1001 | jq
 ```
+
+## Phase 2: Explainable Intent & Orchestration
+This phase adds intent traceability, saga state tracking, and explainable planning without external LLM calls.
+
+### Example trace walkthrough
+1. Send an intent and capture the `traceId`:
+   ```bash
+   curl -s -X POST http://localhost:3000/v1/intent \
+     -H 'content-type: application/json' \
+     -d '{"text":"low stock SKU123"}' | jq
+   ```
+2. Fetch the explanation narrative:
+   ```bash
+   curl -s http://localhost:8000/v1/explain/<traceId> | jq
+   ```
+
+The explain endpoint summarizes the original intent, saga timeline, and outcome for quick debugging.
 
 ## Event flow (short)
 1. Domain services publish intent events (ex: `sapience.procurement.po.requested`).

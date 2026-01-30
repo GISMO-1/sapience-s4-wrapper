@@ -8,59 +8,74 @@ import { consumer, startConsumer, stopConsumer } from "./events/consumer";
 import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
-import { v4 as uuidv4 } from "uuid";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, TraceAwareRequest } from "./trace";
+import { handleLowStockEvent, handlePoCreatedEvent } from "./saga";
+import { PostgresSagaRepository } from "./saga-store";
 
 const app = Fastify({ logger: false });
 
 async function start(): Promise<void> {
   await startTelemetry();
   await migrate();
+  app.addHook("onRequest", (request, reply, done) => {
+    ensureTraceId(request as TraceAwareRequest, reply);
+    done();
+  });
   await startProducer();
   await startConsumer();
 
+  const sagaRepository = new PostgresSagaRepository(db);
+
   await consumer.subscribe({ topic: topics.supplychainLowStockDetected, fromBeginning: true });
+  await consumer.subscribe({ topic: topics.integrationPoCreated, fromBeginning: true });
   await consumer.run({
     eachMessage: async ({ message }) => {
       if (!message.value) {
-        logger.warn("Received empty message");
+        logger.warn({ traceId: "system" }, "Received empty message");
         return;
       }
 
       try {
-        const payload = JSON.parse(message.value.toString()) as EventEnvelope<{ sku: string; quantity: number }>;
-        const sagaId = uuidv4();
-        await db.query(
-          "INSERT INTO sagas (id, status, sku, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())",
-          [sagaId, "started", payload.data.sku]
-        );
+        const payload = JSON.parse(message.value.toString()) as EventEnvelope<{
+          sku: string;
+          quantity: number;
+        }>;
 
-        const poRequest = {
-          sku: payload.data.sku,
-          quantity: Math.max(10, payload.data.quantity * 2)
-        };
-
-        const event: EventEnvelope<typeof poRequest> = {
-          id: uuidv4(),
-          type: topics.procurementPoRequested,
-          source: config.serviceName,
-          time: new Date().toISOString(),
-          subject: payload.data.sku,
-          data: poRequest
-        };
-
-        await producer.send({
-          topic: topics.procurementPoRequested,
-          messages: [{ value: JSON.stringify(event) }]
-        });
-
-        await db.query("UPDATE sagas SET status = $1, updated_at = NOW() WHERE id = $2", [
-          "requested",
-          sagaId
-        ]);
-        logger.info({ sagaId, sku: payload.data.sku }, "Saga requested procurement");
+        if (payload.type === topics.supplychainLowStockDetected) {
+          logger.info({ traceId: payload.traceId, eventType: payload.type }, "Event consumed");
+          const { sagaId, event, created } = await handleLowStockEvent(sagaRepository, payload);
+          if (created) {
+            logger.info({ sagaId, traceId: payload.traceId, eventType: payload.type }, "Saga started");
+          }
+          if (event) {
+            await producer.send({
+              topic: topics.procurementPoRequested,
+              messages: [{ value: JSON.stringify(event) }]
+            });
+            logger.info(
+              { sagaId, traceId: payload.traceId, eventType: event.type },
+              "Saga requested procurement"
+            );
+          }
+        } else if (payload.type === topics.integrationPoCreated) {
+          const completionPayload = payload as EventEnvelope<{
+            id: string;
+            sku: string;
+            quantity: number;
+            status: string;
+          }>;
+          logger.info({ traceId: completionPayload.traceId, eventType: completionPayload.type }, "Event consumed");
+          const result = await handlePoCreatedEvent(sagaRepository, completionPayload);
+          if (result.state) {
+            logger.info(
+              { sagaId: result.sagaId, traceId: completionPayload.traceId, eventType: completionPayload.type },
+              `Saga ${result.state.toLowerCase()}`
+            );
+          }
+        }
       } catch (error) {
-        logger.error({ error }, "Failed to orchestrate procurement saga");
+        logger.error({ error, traceId: "system", eventType: "saga.handler" }, "Failed to orchestrate procurement saga");
       }
     }
   });
@@ -69,11 +84,11 @@ async function start(): Promise<void> {
   await registerRoutes(app);
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
-  logger.info({ port: config.port }, "Orchestration service listening");
+  logger.info({ port: config.port, traceId: "system" }, "Orchestration service listening");
 }
 
 async function shutdown(): Promise<void> {
-  logger.info("Shutting down orchestration service");
+  logger.info({ traceId: "system" }, "Shutting down orchestration service");
   await stopConsumer();
   await stopProducer();
   await db.end();
@@ -85,6 +100,6 @@ process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
 
 start().catch((error) => {
-  logger.error({ error }, "Failed to start orchestration service");
+  logger.error({ error, traceId: "system" }, "Failed to start orchestration service");
   process.exit(1);
 });

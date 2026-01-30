@@ -4,3 +4,4 @@ CREATE DATABASE finance;
 CREATE DATABASE integration;
 CREATE DATABASE orchestration;
 CREATE DATABASE ai;
+CREATE DATABASE api_gateway;

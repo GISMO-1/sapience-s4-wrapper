@@ -1,7 +1,19 @@
 CREATE TABLE IF NOT EXISTS sagas (
   id TEXT PRIMARY KEY,
+  trace_id TEXT NOT NULL,
   status TEXT NOT NULL,
   sku TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS saga_events (
+  id TEXT PRIMARY KEY,
+  saga_id TEXT NOT NULL REFERENCES sagas(id),
+  trace_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  event_id TEXT NOT NULL UNIQUE,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );

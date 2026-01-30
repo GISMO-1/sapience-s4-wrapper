@@ -10,6 +10,8 @@ import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
 import { v4 as uuidv4 } from "uuid";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, TraceAwareRequest } from "./trace";
+import { randomUUID } from "node:crypto";
 
 const app = Fastify({ logger: false });
 let lowStockTimer: NodeJS.Timeout | null = null;
@@ -17,6 +19,10 @@ let lowStockTimer: NodeJS.Timeout | null = null;
 async function start(): Promise<void> {
   await startTelemetry();
   await migrate();
+  app.addHook("onRequest", (request, reply, done) => {
+    ensureTraceId(request as TraceAwareRequest, reply);
+    done();
+  });
   await startProducer();
   await startConsumer();
 
@@ -24,7 +30,7 @@ async function start(): Promise<void> {
   await consumer.run({
     eachMessage: async ({ message }) => {
       if (!message.value) {
-        logger.warn("Received empty message");
+        logger.warn({ traceId: "system" }, "Received empty message");
         return;
       }
 
@@ -35,14 +41,19 @@ async function start(): Promise<void> {
           quantity: number;
           status: string;
         }>;
+        const traceId = payload.traceId ?? "unknown";
+        logger.info({ traceId, eventType: payload.type }, "Event consumed");
 
         await db.query(
           "INSERT INTO inventory (sku, quantity, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (sku) DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = NOW()",
           [payload.data.sku, payload.data.quantity]
         );
-        logger.info({ sku: payload.data.sku }, "Updated inventory projection");
+        logger.info(
+          { sku: payload.data.sku, traceId, eventType: payload.type },
+          "Updated inventory projection"
+        );
       } catch (error) {
-        logger.error({ error }, "Failed to update inventory projection");
+        logger.error({ error, traceId: "system", eventType: topics.integrationPoCreated }, "Failed to update inventory projection");
       }
     }
   });
@@ -54,12 +65,14 @@ async function start(): Promise<void> {
       ]);
 
       for (const row of result.rows) {
+        const traceId = randomUUID();
         const event: EventEnvelope<{ sku: string; quantity: number }> = {
           id: uuidv4(),
           type: topics.supplychainLowStockDetected,
           source: config.serviceName,
           time: new Date().toISOString(),
           subject: row.sku,
+          traceId,
           data: { sku: row.sku, quantity: row.quantity }
         };
 
@@ -67,10 +80,13 @@ async function start(): Promise<void> {
           topic: topics.supplychainLowStockDetected,
           messages: [{ value: JSON.stringify(event) }]
         });
-        logger.info({ sku: row.sku }, "Published low stock event");
+        logger.info(
+          { sku: row.sku, traceId, eventType: event.type },
+          "Published low stock event"
+        );
       }
     } catch (error) {
-      logger.error({ error }, "Low stock scan failed");
+      logger.error({ error, traceId: "system", eventType: topics.supplychainLowStockDetected }, "Low stock scan failed");
     }
   }, 15000);
 
@@ -78,11 +94,11 @@ async function start(): Promise<void> {
   await registerRoutes(app);
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
-  logger.info({ port: config.port }, "Supply chain service listening");
+  logger.info({ port: config.port, traceId: "system" }, "Supply chain service listening");
 }
 
 async function shutdown(): Promise<void> {
-  logger.info("Shutting down supply chain service");
+  logger.info({ traceId: "system" }, "Shutting down supply chain service");
   if (lowStockTimer) {
     clearInterval(lowStockTimer);
   }
@@ -97,6 +113,6 @@ process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
 
 start().catch((error) => {
-  logger.error({ error }, "Failed to start supply chain service");
+  logger.error({ error, traceId: "system" }, "Failed to start supply chain service");
   process.exit(1);
 });

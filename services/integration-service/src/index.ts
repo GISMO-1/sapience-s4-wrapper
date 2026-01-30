@@ -7,17 +7,19 @@ import { migrate, db } from "./db";
 import { consumer, startConsumer, stopConsumer } from "./events/consumer";
 import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
-import { FakeSapAdapter } from "./sap/fakeAdapter";
 import { EventEnvelope } from "./events/envelope";
-import { v4 as uuidv4 } from "uuid";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, TraceAwareRequest } from "./trace";
+import { buildPoCreatedEvent } from "./handlers";
 
 const app = Fastify({ logger: false });
-const sapAdapter = new FakeSapAdapter();
-
 async function start(): Promise<void> {
   await startTelemetry();
   await migrate();
+  app.addHook("onRequest", (request, reply, done) => {
+    ensureTraceId(request as TraceAwareRequest, reply);
+    done();
+  });
   await startProducer();
   await startConsumer();
 
@@ -25,35 +27,31 @@ async function start(): Promise<void> {
   await consumer.run({
     eachMessage: async ({ message }) => {
       if (!message.value) {
-        logger.warn("Received empty message");
+        logger.warn({ traceId: "system" }, "Received empty message");
         return;
       }
 
       try {
         const payload = JSON.parse(message.value.toString()) as EventEnvelope<{ sku: string; quantity: number }>;
-        const result = await sapAdapter.createPurchaseOrder(payload.data);
+        const traceId = payload.traceId ?? "unknown";
+        logger.info({ traceId, eventType: payload.type }, "Event consumed");
+        logger.info({ traceId, eventType: "sap.adapter.invoked" }, "Invoking SAP adapter");
+        const completion = await buildPoCreatedEvent(payload);
         await db.query(
           "INSERT INTO purchase_orders (id, sku, quantity, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
-          [result.id, result.sku, result.quantity, result.status]
+          [completion.data.id, completion.data.sku, completion.data.quantity, completion.data.status]
         );
-
-        const completion: EventEnvelope<typeof result> = {
-          id: uuidv4(),
-          type: topics.integrationPoCreated,
-          source: config.serviceName,
-          time: new Date().toISOString(),
-          subject: result.id,
-          traceId: payload.traceId,
-          data: result
-        };
 
         await producer.send({
           topic: topics.integrationPoCreated,
           messages: [{ value: JSON.stringify(completion) }]
         });
-        logger.info({ purchaseOrderId: result.id }, "Published integration PO created event");
+        logger.info(
+          { purchaseOrderId: completion.data.id, traceId, eventType: completion.type },
+          "Published integration PO created event"
+        );
       } catch (error) {
-        logger.error({ error }, "Failed to process intent event");
+        logger.error({ error, traceId: "system", eventType: topics.procurementPoRequested }, "Failed to process intent event");
       }
     }
   });
@@ -64,11 +62,11 @@ async function start(): Promise<void> {
   app.get("/", async () => ({ service: config.serviceName }));
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
-  logger.info({ port: config.port }, "Integration service listening");
+  logger.info({ port: config.port, traceId: "system" }, "Integration service listening");
 }
 
 async function shutdown(): Promise<void> {
-  logger.info("Shutting down integration service");
+  logger.info({ traceId: "system" }, "Shutting down integration service");
   await stopConsumer();
   await stopProducer();
   await db.end();
@@ -80,6 +78,6 @@ process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
 
 start().catch((error) => {
-  logger.error({ error }, "Failed to start integration service");
+  logger.error({ error, traceId: "system" }, "Failed to start integration service");
   process.exit(1);
 });

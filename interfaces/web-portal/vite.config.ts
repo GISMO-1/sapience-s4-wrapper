@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   plugins: [react()],
   server:
-    command === "serve"
+    command === "serve" && mode !== "test"
       ? {
           port: 5173,
           host: "0.0.0.0"
@@ -12,6 +12,8 @@ export default defineConfig(({ command }) => ({
       : undefined,
   test: {
     environment: "jsdom",
-    globals: true
+    globals: true,
+    pool: "threads",
+    setupFiles: []
   }
 }));

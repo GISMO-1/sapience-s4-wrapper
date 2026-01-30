@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import type { Logger } from "pino";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 
 const TRACE_HEADER = "x-trace-id";
 
@@ -16,7 +16,7 @@ export function ensureTraceId(headers?: Record<string, string | string[] | undef
   if (candidate && candidate.trim().length > 0) {
     return candidate;
   }
-  return uuidv4();
+  return randomUUID();
 }
 
 export function getTraceIdFromRequest(request: Pick<FastifyRequest, "headers">): string {

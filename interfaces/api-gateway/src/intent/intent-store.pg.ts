@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import { Intent, intentSchema } from "./intent-model";
 import { IntentStore, StoredIntent } from "./intent-store";
@@ -14,7 +14,7 @@ const pool = new Pool({
 
 export class PostgresIntentStore implements IntentStore {
   async saveIntent(intent: Intent, traceId: string): Promise<StoredIntent> {
-    const id = uuidv4();
+    const id = randomUUID();
     const createdAt = new Date();
     await pool.query(
       "INSERT INTO intents (id, trace_id, intent_type, raw_text, parsed_json, confidence, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",

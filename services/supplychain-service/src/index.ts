@@ -8,7 +8,7 @@ import { consumer, startConsumer, stopConsumer } from "./events/consumer";
 import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { startTelemetry, stopTelemetry } from "./telemetry";
 import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
@@ -64,7 +64,7 @@ async function start(): Promise<void> {
       for (const row of result.rows) {
         const traceId = ensureTraceId();
         const event: EventEnvelope<{ sku: string; quantity: number }> = {
-          id: uuidv4(),
+          id: randomUUID(),
           type: topics.supplychainLowStockDetected,
           source: config.serviceName,
           time: new Date().toISOString(),

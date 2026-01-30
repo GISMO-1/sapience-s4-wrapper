@@ -3,7 +3,7 @@ import { z } from "zod";
 import { producer } from "../events/producer";
 import { topics } from "../events/topics";
 import { EventEnvelope } from "../events/envelope";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import { getTraceIdFromRequest } from "../trace/trace";
 
@@ -18,7 +18,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const traceId = getTraceIdFromRequest(request);
 
     const event: EventEnvelope<typeof body> = {
-      id: uuidv4(),
+      id: randomUUID(),
       type: topics.procurementPoRequested,
       source: config.serviceName,
       time: new Date().toISOString(),

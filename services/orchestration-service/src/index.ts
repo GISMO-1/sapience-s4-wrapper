@@ -8,7 +8,7 @@ import { consumer, startConsumer, stopConsumer } from "./events/consumer";
 import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { startTelemetry, stopTelemetry } from "./telemetry";
 import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 import { buildSagaEventId, buildSagaId } from "./saga/saga";
@@ -71,7 +71,7 @@ async function start(): Promise<void> {
         };
 
         const event: EventEnvelope<typeof poRequest> = {
-          id: uuidv4(),
+          id: randomUUID(),
           type: topics.procurementPoRequested,
           source: config.serviceName,
           time: new Date().toISOString(),

@@ -9,11 +9,18 @@ import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
 const app = Fastify({ logger: false });
 
 async function start(): Promise<void> {
   await startTelemetry();
+  app.addHook("onRequest", (request, reply, done) => {
+    const traceId = getTraceIdFromRequest(request);
+    reply.header("x-trace-id", traceId);
+    (request.headers as Record<string, string>)["x-trace-id"] = traceId;
+    done();
+  });
   await migrate();
   await startProducer();
   await startConsumer();
@@ -34,12 +41,16 @@ async function start(): Promise<void> {
           status: string;
         }>;
 
+        const traceId = ensureTraceId({ "x-trace-id": payload.traceId });
         await db.query(
           "INSERT INTO purchase_orders (id, sku, quantity, status, updated_at) VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (id) DO UPDATE SET status = $4, updated_at = NOW()",
           [payload.data.id, payload.data.sku, payload.data.quantity, payload.data.status]
         );
 
-        logger.info({ purchaseOrderId: payload.data.id }, "Updated procurement status");
+        withTraceId(logger, traceId).info(
+          { purchaseOrderId: payload.data.id },
+          "Updated procurement status"
+        );
       } catch (error) {
         logger.error({ error }, "Failed to handle integration event");
       }

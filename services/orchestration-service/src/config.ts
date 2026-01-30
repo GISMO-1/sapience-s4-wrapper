@@ -13,5 +13,6 @@ export const config = {
     password: process.env.DB_PASSWORD ?? "sapience",
     database: process.env.DB_NAME ?? "orchestration"
   },
-  logLevel: process.env.LOG_LEVEL ?? "info"
+  logLevel: process.env.LOG_LEVEL ?? "info",
+  useInMemoryStore: process.env.USE_INMEMORY_STORE === "true"
 };

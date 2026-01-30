@@ -13,3 +13,13 @@ export async function sendIntent(text: string) {
 
   return response.json();
 }
+
+export async function fetchTraceExplain(traceId: string) {
+  const response = await fetch(`${API_BASE}/v1/assist/explain/${encodeURIComponent(traceId)}`);
+
+  if (!response.ok) {
+    throw new Error("Trace explain request failed");
+  }
+
+  return response.json();
+}

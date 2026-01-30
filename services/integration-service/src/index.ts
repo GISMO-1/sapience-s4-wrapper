@@ -11,12 +11,19 @@ import { FakeSapAdapter } from "./sap/fakeAdapter";
 import { EventEnvelope } from "./events/envelope";
 import { v4 as uuidv4 } from "uuid";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
 const app = Fastify({ logger: false });
 const sapAdapter = new FakeSapAdapter();
 
 async function start(): Promise<void> {
   await startTelemetry();
+  app.addHook("onRequest", (request, reply, done) => {
+    const traceId = getTraceIdFromRequest(request);
+    reply.header("x-trace-id", traceId);
+    (request.headers as Record<string, string>)["x-trace-id"] = traceId;
+    done();
+  });
   await migrate();
   await startProducer();
   await startConsumer();
@@ -31,6 +38,7 @@ async function start(): Promise<void> {
 
       try {
         const payload = JSON.parse(message.value.toString()) as EventEnvelope<{ sku: string; quantity: number }>;
+        const traceId = ensureTraceId({ "x-trace-id": payload.traceId });
         const result = await sapAdapter.createPurchaseOrder(payload.data);
         await db.query(
           "INSERT INTO purchase_orders (id, sku, quantity, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
@@ -43,7 +51,7 @@ async function start(): Promise<void> {
           source: config.serviceName,
           time: new Date().toISOString(),
           subject: result.id,
-          traceId: payload.traceId,
+          traceId,
           data: result
         };
 
@@ -51,7 +59,7 @@ async function start(): Promise<void> {
           topic: topics.integrationPoCreated,
           messages: [{ value: JSON.stringify(completion) }]
         });
-        logger.info({ purchaseOrderId: result.id }, "Published integration PO created event");
+        withTraceId(logger, traceId).info({ purchaseOrderId: result.id }, "Published integration PO created event");
       } catch (error) {
         logger.error({ error }, "Failed to process intent event");
       }

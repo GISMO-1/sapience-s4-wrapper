@@ -4,11 +4,18 @@ import { logger } from "./logger";
 import { registerHealthRoutes } from "./health";
 import { registerRoutes } from "./routes";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { getTraceIdFromRequest } from "./trace/trace";
 
 const app = Fastify({ logger: false });
 
 async function start(): Promise<void> {
   await startTelemetry();
+  app.addHook("onRequest", (request, reply, done) => {
+    const traceId = getTraceIdFromRequest(request);
+    reply.header("x-trace-id", traceId);
+    (request.headers as Record<string, string>)["x-trace-id"] = traceId;
+    done();
+  });
   await registerHealthRoutes(app);
   await registerRoutes(app);
 

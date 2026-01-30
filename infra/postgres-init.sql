@@ -1,0 +1,6 @@
+CREATE DATABASE procurement;
+CREATE DATABASE supplychain;
+CREATE DATABASE finance;
+CREATE DATABASE integration;
+CREATE DATABASE orchestration;
+CREATE DATABASE ai;

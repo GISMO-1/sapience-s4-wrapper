@@ -1,0 +1,15 @@
+{
+  "name": "sapience-s4-wrapper",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": [
+    "services/*",
+    "interfaces/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev": "pnpm -r dev",
+    "lint": "pnpm -r lint"
+  }
+}

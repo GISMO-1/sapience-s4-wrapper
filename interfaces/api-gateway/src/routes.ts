@@ -16,12 +16,15 @@ import { buildPolicyExplainResponse } from "./policy-code/explain";
 import { createPolicyReplayStore } from "./policy-replay/replay-store";
 import { createPolicyReplayEngine } from "./policy-replay/replay-engine";
 import { buildReport } from "./policy-replay/report";
+import { calculatePolicyImpact } from "./policy-lifecycle/impact";
+import { createPolicyLifecycleStore } from "./policy-lifecycle/store";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
 const policyEvaluator = createPolicyEvaluator();
 const replayStore = createPolicyReplayStore();
 const replayEngine = createPolicyReplayEngine(replayStore);
+const lifecycleStore = createPolicyLifecycleStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -71,6 +74,13 @@ const replayResultsQuerySchema = z.object({
 
 const replayRunQuerySchema = z.object({
   limit: z.string().optional()
+});
+
+const promoteRequestSchema = z.object({
+  runId: z.string().min(1),
+  approvedBy: z.string().min(1),
+  reason: z.string().min(1),
+  notes: z.string().optional()
 });
 
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
@@ -158,6 +168,14 @@ async function handleIntent(parsed: Intent, traceId: string) {
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
+  const snapshot = policyEvaluator.getPolicySnapshot();
+  lifecycleStore.setActivePolicy({
+    hash: snapshot.info.hash,
+    version: snapshot.info.version,
+    path: snapshot.info.path,
+    loadedAt: snapshot.info.loadedAt
+  });
+
   app.post("/v1/intent", async (request) => {
     const body = intentSchema.parse(request.body);
     const traceId = getTraceIdFromRequest(request);
@@ -282,6 +300,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       throw error;
     }
 
+    lifecycleStore.registerDraft({
+      hash: candidate.info.hash,
+      source: candidate.source,
+      ref: candidate.ref ?? null
+    });
+
     const filters = body.filters
       ? {
           intentTypes: body.filters.intentTypes,
@@ -297,6 +321,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       filters,
       requestedBy: body.requestedBy,
       executionMode
+    });
+
+    lifecycleStore.markSimulated({
+      hash: run.candidate.hash,
+      source: run.candidate.source,
+      ref: run.candidate.ref ?? null
     });
 
     return { traceId, run };
@@ -343,6 +373,60 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const offset = query.offset && Number.isFinite(Number(query.offset)) ? Number(query.offset) : undefined;
     const results = await replayEngine.getRunResults(runId, { changed, limit, offset });
     return { traceId, runId, results };
+  });
+
+  app.get("/v1/policy/status", async (request) => {
+    const traceId = getTraceIdFromRequest(request);
+    const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const active = lifecycleStore.setActivePolicy({
+      hash: activeSnapshot.info.hash,
+      version: activeSnapshot.info.version,
+      path: activeSnapshot.info.path,
+      loadedAt: activeSnapshot.info.loadedAt
+    });
+
+    return {
+      traceId,
+      active,
+      policies: lifecycleStore.listStatuses()
+    };
+  });
+
+  app.post("/v1/policy/promote", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const body = promoteRequestSchema.parse(request.body ?? {});
+    const run = await replayStore.getRun(body.runId);
+    if (!run) {
+      reply.code(404);
+      return { message: "Replay run not found", traceId };
+    }
+    const results = await replayStore.getResults(run.id, { limit: run.limit, offset: 0 });
+    const impact = calculatePolicyImpact(results, config.policyImpact);
+    if (impact.blocked) {
+      reply.code(409);
+      return { message: "Promotion blocked by impact guardrails.", traceId, impact };
+    }
+
+    const approval = {
+      approvedBy: body.approvedBy,
+      approvedAt: new Date().toISOString(),
+      reason: body.reason,
+      notes: body.notes,
+      runId: run.id
+    };
+
+    const promoted = lifecycleStore.promotePolicy({
+      hash: run.candidatePolicyHash,
+      source: run.candidatePolicySource,
+      ref: run.candidatePolicyRef ?? null,
+      approval
+    });
+
+    return {
+      traceId,
+      promoted,
+      impact
+    };
   });
 
   app.all("/v1/procurement/*", async (request, reply) => {

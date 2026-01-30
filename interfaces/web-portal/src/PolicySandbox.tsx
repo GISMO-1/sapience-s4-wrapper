@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { fetchReplayReport, fetchTraceExplain, runPolicyReplay, type ReplayCandidateSource, type ReplayReport } from "./api";
+import {
+  fetchReplayReport,
+  fetchTraceExplain,
+  promotePolicy,
+  runPolicyReplay,
+  type ReplayCandidateSource,
+  type ReplayReport
+} from "./api";
 
 const DEFAULT_INLINE = "version: \"v1\"\n";
 
@@ -13,6 +20,12 @@ export function PolicySandbox() {
   const [report, setReport] = useState<ReplayReport | null>(null);
   const [traceExplain, setTraceExplain] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [approver, setApprover] = useState("");
+  const [approvalReason, setApprovalReason] = useState("");
+  const [approvalNotes, setApprovalNotes] = useState("");
+  const [promotionStatus, setPromotionStatus] = useState<string>("");
+  const [promotionError, setPromotionError] = useState<string>("");
+  const [promotionLoading, setPromotionLoading] = useState(false);
 
   const buildFilters = () => {
     const parsedLimit = Number(limit);
@@ -42,6 +55,8 @@ export function PolicySandbox() {
     setError("");
     setReport(null);
     setTraceExplain("");
+    setPromotionStatus("");
+    setPromotionError("");
     try {
       const response = await runPolicyReplay({ candidatePolicy: buildCandidate(), filters: buildFilters() });
       const runId = response?.run?.runId;
@@ -54,6 +69,28 @@ export function PolicySandbox() {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePromote = async () => {
+    if (!report) {
+      return;
+    }
+    setPromotionLoading(true);
+    setPromotionError("");
+    setPromotionStatus("");
+    try {
+      await promotePolicy({
+        runId: report.run.runId,
+        approvedBy: approver.trim(),
+        reason: approvalReason.trim(),
+        notes: approvalNotes.trim() || undefined
+      });
+      setPromotionStatus("Policy promoted successfully.");
+    } catch (err) {
+      setPromotionError((err as Error).message);
+    } finally {
+      setPromotionLoading(false);
     }
   };
 
@@ -171,6 +208,68 @@ export function PolicySandbox() {
               <div>Allow: {report.deltas.allowDelta}</div>
               <div>Warn: {report.deltas.warnDelta}</div>
               <div>Deny: {report.deltas.denyDelta}</div>
+            </div>
+            <div>
+              <strong>Impact</strong>
+              <div>Score: {report.impact.score}</div>
+              <div>Changed decisions: {report.impact.counts.changedDecisions}</div>
+              <div>Deny → Allow flips: {report.impact.counts.denyToAllowFlips}</div>
+              <div>Rate-limit hits: {report.impact.counts.rateLimitViolations}</div>
+              <div>High-risk signals: {report.impact.counts.highRiskSignals}</div>
+              <div className={report.impact.blocked ? "impact-blocked" : "impact-ok"}>
+                {report.impact.blocked ? "Promotion blocked" : "Promotion eligible"}
+              </div>
+            </div>
+          </div>
+
+          <div className="sandbox-card sandbox-approval">
+            <h4>Promotion approval</h4>
+            <div className="sandbox-row">
+              <label>
+                Approved by
+                <input
+                  type="text"
+                  value={approver}
+                  onChange={(event) => setApprover(event.target.value)}
+                  placeholder="Analyst name"
+                />
+              </label>
+              <label>
+                Reason
+                <input
+                  type="text"
+                  value={approvalReason}
+                  onChange={(event) => setApprovalReason(event.target.value)}
+                  placeholder="e.g. regression safe"
+                />
+              </label>
+            </div>
+            <div className="sandbox-row">
+              <label className="sandbox-notes">
+                Approval notes
+                <textarea
+                  value={approvalNotes}
+                  onChange={(event) => setApprovalNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Optional details for audit trail"
+                />
+              </label>
+            </div>
+            <div className="sandbox-actions">
+              <button
+                type="button"
+                onClick={handlePromote}
+                disabled={
+                  promotionLoading ||
+                  report.impact.blocked ||
+                  !approver.trim() ||
+                  !approvalReason.trim()
+                }
+              >
+                {promotionLoading ? "Promoting..." : "Promote policy"}
+              </button>
+              {promotionStatus && <span className="sandbox-success">{promotionStatus}</span>}
+              {promotionError && <span className="sandbox-error">{promotionError}</span>}
             </div>
           </div>
 

@@ -32,6 +32,31 @@ export async function fetchTraceExplain(traceId: string) {
 
 export type ReplayCandidateSource = "current" | "path" | "inline";
 
+export type PolicyImpactReport = {
+  score: number;
+  weights: {
+    changedDecisions: number;
+    denyToAllowFlips: number;
+    rateLimitViolations: number;
+    highRiskSignals: number;
+  };
+  counts: {
+    changedDecisions: number;
+    denyToAllowFlips: number;
+    rateLimitViolations: number;
+    highRiskSignals: number;
+  };
+  thresholds: {
+    score: number;
+    changedDecisions: number;
+    denyToAllowFlips: number;
+    rateLimitViolations: number;
+    highRiskSignals: number;
+  };
+  exceeded: string[];
+  blocked: boolean;
+};
+
 export type ReplayReport = {
   traceId: string;
   run: {
@@ -70,6 +95,7 @@ export type ReplayReport = {
     baselineRules: string[];
     candidateRules: string[];
   }>;
+  impact: PolicyImpactReport;
 };
 
 export async function runPolicyReplay(payload: {
@@ -95,6 +121,37 @@ export async function fetchReplayReport(runId: string): Promise<ReplayReport> {
 
   if (!response.ok) {
     throw new Error("Replay report request failed");
+  }
+
+  return response.json();
+}
+
+export async function promotePolicy(payload: {
+  runId: string;
+  approvedBy: string;
+  reason: string;
+  notes?: string;
+}) {
+  const response = await fetch(buildUrl("/v1/policy/promote"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => ({}));
+    const message = typeof errorPayload.message === "string" ? errorPayload.message : "Policy promotion failed";
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function fetchPolicyStatus() {
+  const response = await fetch(buildUrl("/v1/policy/status"));
+
+  if (!response.ok) {
+    throw new Error("Policy status request failed");
   }
 
   return response.json();

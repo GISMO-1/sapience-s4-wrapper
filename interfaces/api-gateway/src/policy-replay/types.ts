@@ -1,5 +1,6 @@
 import type { Intent } from "../intent/intent-model";
 import type { PolicyDecision, PolicyDecisionResult, PolicyReason, RiskAssessment } from "../policy-code/types";
+import type { PolicyImpactReport } from "../policy-lifecycle/types";
 
 export type ReplayCandidateSource = "current" | "path" | "inline";
 
@@ -64,6 +65,7 @@ export type ReplayResultRecord = {
   candidatePolicyHash: string;
   baselineMatchedRules: string[];
   candidateMatchedRules: string[];
+  candidateConstraintTypes: string[];
   reasons: PolicyReason[];
   categories: string[];
   risk: RiskAssessment;
@@ -112,6 +114,7 @@ export type ReplayRunDetails = ReplaySummary & {
 export type ReplayCandidateEvaluation = {
   decision: PolicyDecisionResult;
   matchedRuleIds: string[];
+  constraintTypes: string[];
   reasons: PolicyReason[];
   categories: string[];
   risk: RiskAssessment;
@@ -165,4 +168,5 @@ export type ReplayReport = {
     baselineRules: string[];
     candidateRules: string[];
   }>;
+  impact: PolicyImpactReport;
 };

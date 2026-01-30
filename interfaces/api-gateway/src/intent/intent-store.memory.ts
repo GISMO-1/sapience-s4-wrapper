@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { Intent } from "./intent-model";
 import { IntentStore, StoredIntent } from "./intent-store";
 
@@ -7,7 +7,7 @@ export class InMemoryIntentStore implements IntentStore {
 
   async saveIntent(intent: Intent, traceId: string): Promise<StoredIntent> {
     const stored: StoredIntent = {
-      id: uuidv4(),
+      id: randomUUID(),
       traceId,
       intent,
       createdAt: new Date()

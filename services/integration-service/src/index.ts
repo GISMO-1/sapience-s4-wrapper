@@ -9,7 +9,7 @@ import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { FakeSapAdapter } from "./sap/fakeAdapter";
 import { EventEnvelope } from "./events/envelope";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 import { startTelemetry, stopTelemetry } from "./telemetry";
 import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
@@ -46,7 +46,7 @@ async function start(): Promise<void> {
         );
 
         const completion: EventEnvelope<typeof result> = {
-          id: uuidv4(),
+          id: randomUUID(),
           type: topics.integrationPoCreated,
           source: config.serviceName,
           time: new Date().toISOString(),

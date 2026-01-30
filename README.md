@@ -16,6 +16,19 @@ Once running:
 - Web portal: http://localhost:5173
 - API gateway: http://localhost:3000/health
 
+## Makefile shortcuts
+Purpose: provide consistent local dev commands for containers and tests. Inputs are local Docker and pnpm configuration; outputs are running containers, logs, or test results.
+
+Example command:
+```bash
+make up
+```
+
+Self-check:
+```bash
+make test
+```
+
 ## Endpoints and example curl commands
 ### API gateway intent routing
 ```bash
@@ -23,6 +36,15 @@ curl -s -X POST http://localhost:3000/v1/intent \
   -H 'content-type: application/json' \
   -d '{"text":"create a PO for laptops"}' | jq
 ```
+
+### AI assist planner (gateway passthrough)
+```bash
+curl -s -X POST http://localhost:3000/v1/assist \
+  -H 'content-type: application/json' \
+  -d '{"text":"review invoice INV-2024"}' | jq
+```
+
+To execute the first tool call via the gateway, set `EXECUTE_TOOL_CALLS=true` for the API gateway container.
 
 ### Procurement: request a purchase order
 ```bash

@@ -85,6 +85,11 @@ The API gateway loads policy rules from `policies/policies.v1.yaml` and enforces
 curl -s -X POST http://localhost:3000/v1/policy/reload | jq
 ```
 
+Policy replay now includes an executive-ready impact report plus a minimal sandbox UI in the web portal. Use the replay endpoints to compare baseline vs. candidate decisions:
+- `POST /v1/policy/replay` to execute a replay run.
+- `GET /v1/policy/replay/:runId/report` to fetch totals, deltas, and top changes.
+- `GET /v1/policy/current` to inspect the loaded policy snapshot.
+
 ## Event flow (short)
 1. Domain services publish intent events (ex: `sapience.procurement.po.requested`).
 2. The integration service receives intent events, calls the SAP adapter (currently fake), and publishes completion events (ex: `sapience.integration.po.created`).

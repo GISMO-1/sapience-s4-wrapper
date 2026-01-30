@@ -15,6 +15,7 @@ import type { ExecutionMode, PolicyInfo } from "./policy-code/types";
 import { buildPolicyExplainResponse } from "./policy-code/explain";
 import { createPolicyReplayStore } from "./policy-replay/replay-store";
 import { createPolicyReplayEngine } from "./policy-replay/replay-engine";
+import { buildReport } from "./policy-replay/report";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -255,6 +256,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.get("/v1/policy/current", async () => {
+    const snapshot = policyEvaluator.getPolicySnapshot();
+    return {
+      version: snapshot.info.version,
+      hash: snapshot.info.hash,
+      loadedAt: snapshot.info.loadedAt,
+      path: snapshot.info.path
+    };
+  });
+
   app.post("/v1/policy/replay", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
     const body = replayRequestSchema.parse(request.body ?? {});
@@ -302,6 +313,19 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Replay run not found", traceId };
     }
     return { traceId, run };
+  });
+
+  app.get("/v1/policy/replay/:runId/report", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const runId = String((request.params as { runId: string }).runId);
+    const run = await replayStore.getRun(runId);
+    if (!run) {
+      reply.code(404);
+      return { message: "Replay run not found", traceId };
+    }
+    const results = await replayStore.getResults(runId, { limit: run.limit, offset: 0 });
+    const report = buildReport(run, results);
+    return { traceId, ...report };
   });
 
   app.get("/v1/policy/replay/:runId/results", async (request, reply) => {

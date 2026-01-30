@@ -5,6 +5,7 @@ import { topics } from "../events/topics";
 import { EventEnvelope } from "../events/envelope";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config";
+import { getTraceIdFromRequest } from "../trace/trace";
 
 const requestSchema = z.object({
   sku: z.string().min(1),
@@ -14,6 +15,7 @@ const requestSchema = z.object({
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.post("/v1/purchase-orders/request", async (request, reply) => {
     const body = requestSchema.parse(request.body);
+    const traceId = getTraceIdFromRequest(request);
 
     const event: EventEnvelope<typeof body> = {
       id: uuidv4(),
@@ -21,7 +23,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       source: config.serviceName,
       time: new Date().toISOString(),
       subject: body.sku,
-      traceId: request.headers["x-trace-id"] as string | undefined,
+      traceId,
       data: body
     };
 

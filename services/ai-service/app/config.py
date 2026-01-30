@@ -13,6 +13,8 @@ class Settings:
     db_password: str
     db_name: str
     broker_brokers: str
+    api_gateway_url: str
+    orchestration_url: str
 
 
 def load_settings() -> Settings:
@@ -24,6 +26,8 @@ def load_settings() -> Settings:
         db_password=os.getenv("DB_PASSWORD", "sapience"),
         db_name=os.getenv("DB_NAME", "ai"),
         broker_brokers=os.getenv("BROKER_BROKERS", "localhost:9092"),
+        api_gateway_url=os.getenv("API_GATEWAY_URL", "http://localhost:3000"),
+        orchestration_url=os.getenv("ORCHESTRATION_URL", "http://localhost:3005"),
     )
 
 

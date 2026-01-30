@@ -13,10 +13,13 @@ export const db = new Pool({
 });
 
 export async function migrate(): Promise<void> {
-  const distPath = join(process.cwd(), "dist", "db", "migrations", "001_init.sql");
-  const srcPath = join(process.cwd(), "src", "db", "migrations", "001_init.sql");
-  const sqlPath = existsSync(distPath) ? distPath : srcPath;
-  const sql = readFileSync(sqlPath, "utf8");
-  await db.query(sql);
+  const migrations = ["001_init.sql", "002_sagas.sql"];
+  for (const migration of migrations) {
+    const distPath = join(process.cwd(), "dist", "db", "migrations", migration);
+    const srcPath = join(process.cwd(), "src", "db", "migrations", migration);
+    const sqlPath = existsSync(distPath) ? distPath : srcPath;
+    const sql = readFileSync(sqlPath, "utf8");
+    await db.query(sql);
+  }
   logger.info("Database migrations applied");
 }

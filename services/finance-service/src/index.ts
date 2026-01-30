@@ -9,11 +9,18 @@ import { producer, startProducer, stopProducer } from "./events/producer";
 import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
 const app = Fastify({ logger: false });
 
 async function start(): Promise<void> {
   await startTelemetry();
+  app.addHook("onRequest", (request, reply, done) => {
+    const traceId = getTraceIdFromRequest(request);
+    reply.header("x-trace-id", traceId);
+    (request.headers as Record<string, string>)["x-trace-id"] = traceId;
+    done();
+  });
   await migrate();
   await startProducer();
   await startConsumer();
@@ -34,11 +41,12 @@ async function start(): Promise<void> {
           status: string;
         }>;
 
+        const traceId = ensureTraceId({ "x-trace-id": payload.traceId });
         await db.query(
           "INSERT INTO accruals (id, sku, quantity, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
           [payload.data.id, payload.data.sku, payload.data.quantity, "accrued"]
         );
-        logger.info({ purchaseOrderId: payload.data.id }, "Recorded accrual");
+        withTraceId(logger, traceId).info({ purchaseOrderId: payload.data.id }, "Recorded accrual");
       } catch (error) {
         logger.error({ error }, "Failed to process PO completion event");
       }

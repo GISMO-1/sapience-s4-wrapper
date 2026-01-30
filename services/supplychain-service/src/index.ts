@@ -10,12 +10,19 @@ import { topics } from "./events/topics";
 import { EventEnvelope } from "./events/envelope";
 import { v4 as uuidv4 } from "uuid";
 import { startTelemetry, stopTelemetry } from "./telemetry";
+import { ensureTraceId, getTraceIdFromRequest, withTraceId } from "./trace/trace";
 
 const app = Fastify({ logger: false });
 let lowStockTimer: NodeJS.Timeout | null = null;
 
 async function start(): Promise<void> {
   await startTelemetry();
+  app.addHook("onRequest", (request, reply, done) => {
+    const traceId = getTraceIdFromRequest(request);
+    reply.header("x-trace-id", traceId);
+    (request.headers as Record<string, string>)["x-trace-id"] = traceId;
+    done();
+  });
   await migrate();
   await startProducer();
   await startConsumer();
@@ -36,11 +43,12 @@ async function start(): Promise<void> {
           status: string;
         }>;
 
+        const traceId = ensureTraceId({ "x-trace-id": payload.traceId });
         await db.query(
           "INSERT INTO inventory (sku, quantity, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (sku) DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = NOW()",
           [payload.data.sku, payload.data.quantity]
         );
-        logger.info({ sku: payload.data.sku }, "Updated inventory projection");
+        withTraceId(logger, traceId).info({ sku: payload.data.sku }, "Updated inventory projection");
       } catch (error) {
         logger.error({ error }, "Failed to update inventory projection");
       }
@@ -54,12 +62,14 @@ async function start(): Promise<void> {
       ]);
 
       for (const row of result.rows) {
+        const traceId = ensureTraceId();
         const event: EventEnvelope<{ sku: string; quantity: number }> = {
           id: uuidv4(),
           type: topics.supplychainLowStockDetected,
           source: config.serviceName,
           time: new Date().toISOString(),
           subject: row.sku,
+          traceId,
           data: { sku: row.sku, quantity: row.quantity }
         };
 
@@ -67,7 +77,7 @@ async function start(): Promise<void> {
           topic: topics.supplychainLowStockDetected,
           messages: [{ value: JSON.stringify(event) }]
         });
-        logger.info({ sku: row.sku }, "Published low stock event");
+        withTraceId(logger, traceId).info({ sku: row.sku }, "Published low stock event");
       }
     } catch (error) {
       logger.error({ error }, "Low stock scan failed");

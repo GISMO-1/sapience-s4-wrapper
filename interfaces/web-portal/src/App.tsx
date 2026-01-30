@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { sendIntent } from "./api";
+import { TraceViewer } from "./TraceViewer";
 
 export function App() {
   const [input, setInput] = useState("");
@@ -44,6 +45,7 @@ export function App() {
         <h2>Response</h2>
         <pre>{response || "No response yet."}</pre>
       </section>
+      <TraceViewer />
     </div>
   );
 }

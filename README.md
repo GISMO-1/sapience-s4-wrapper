@@ -1,6 +1,6 @@
 # Sapience – cloud-native AI wrapper for SAP S/4HANA
 
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yaml)
+[![CI](https://github.com/<YOUR_GITHUB_USERNAME>/sapience-s4-wrapper/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/<YOUR_GITHUB_USERNAME>/sapience-s4-wrapper/actions/workflows/ci.yml)
 ![License](https://img.shields.io/github/license/<ORG>/<REPO>)
 ![Node](https://img.shields.io/badge/node-20.x-green)
 ![Python](https://img.shields.io/badge/python-3.11-blue)

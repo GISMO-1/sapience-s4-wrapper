@@ -7,15 +7,20 @@ import { requestInvoiceReview } from "./clients/finance";
 import { getTraceIdFromRequest } from "./trace/trace";
 import { parseIntent } from "./intent/intent-parser";
 import { createIntentStore } from "./intent/intent-store";
-import { Intent } from "./intent/intent-model";
+import { Intent, intentTypeSchema } from "./intent/intent-model";
 import { createPolicyEvaluator } from "./policy-code/evaluator";
+import { loadPolicyFromSource, PolicySourceError } from "./policy-code/loader";
 import { createPolicyStore } from "./policy/policy-store";
 import type { ExecutionMode, PolicyInfo } from "./policy-code/types";
 import { buildPolicyExplainResponse } from "./policy-code/explain";
+import { createPolicyReplayStore } from "./policy-replay/replay-store";
+import { createPolicyReplayEngine } from "./policy-replay/replay-engine";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
 const policyEvaluator = createPolicyEvaluator();
+const replayStore = createPolicyReplayStore();
+const replayEngine = createPolicyReplayEngine(replayStore);
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -36,6 +41,35 @@ const assistResponseSchema = z.object({
       payload: z.record(z.unknown())
     })
   )
+});
+
+const replayRequestSchema = z.object({
+  candidatePolicy: z
+    .object({
+      source: z.enum(["current", "path", "inline"]).default("current"),
+      ref: z.string().optional(),
+      yaml: z.string().optional()
+    })
+    .optional(),
+  filters: z
+    .object({
+      intentTypes: z.array(intentTypeSchema).optional(),
+      since: z.string().datetime().optional(),
+      until: z.string().datetime().optional(),
+      limit: z.number().int().positive().optional()
+    })
+    .optional(),
+  requestedBy: z.string().optional()
+});
+
+const replayResultsQuerySchema = z.object({
+  changed: z.enum(["true", "false"]).optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional()
+});
+
+const replayRunQuerySchema = z.object({
+  limit: z.string().optional()
 });
 
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
@@ -219,6 +253,72 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       policy: snapshot.info,
       source: snapshot.source
     };
+  });
+
+  app.post("/v1/policy/replay", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const body = replayRequestSchema.parse(request.body ?? {});
+    const candidateRequest = body.candidatePolicy ?? { source: "current" };
+
+    let candidate;
+    try {
+      candidate = loadPolicyFromSource(candidateRequest);
+    } catch (error) {
+      if (error instanceof PolicySourceError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+
+    const filters = body.filters
+      ? {
+          intentTypes: body.filters.intentTypes,
+          since: body.filters.since ? new Date(body.filters.since) : undefined,
+          until: body.filters.until ? new Date(body.filters.until) : undefined,
+          limit: body.filters.limit
+        }
+      : undefined;
+
+    const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+    const run = await replayEngine.runReplay({
+      candidate,
+      filters,
+      requestedBy: body.requestedBy,
+      executionMode
+    });
+
+    return { traceId, run };
+  });
+
+  app.get("/v1/policy/replay/:runId", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const runId = String((request.params as { runId: string }).runId);
+    const query = replayRunQuerySchema.parse(request.query ?? {});
+    const limit = query.limit && Number.isFinite(Number(query.limit)) ? Number(query.limit) : undefined;
+    const run = await replayEngine.getRunSummary(runId, { limit });
+    if (!run) {
+      reply.code(404);
+      return { message: "Replay run not found", traceId };
+    }
+    return { traceId, run };
+  });
+
+  app.get("/v1/policy/replay/:runId/results", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const runId = String((request.params as { runId: string }).runId);
+    const run = await replayStore.getRun(runId);
+    if (!run) {
+      reply.code(404);
+      return { message: "Replay run not found", traceId };
+    }
+
+    const query = replayResultsQuerySchema.parse(request.query ?? {});
+    const changed = query.changed ? query.changed === "true" : undefined;
+    const limit = query.limit && Number.isFinite(Number(query.limit)) ? Number(query.limit) : undefined;
+    const offset = query.offset && Number.isFinite(Number(query.offset)) ? Number(query.offset) : undefined;
+    const results = await replayEngine.getRunResults(runId, { changed, limit, offset });
+    return { traceId, runId, results };
   });
 
   app.all("/v1/procurement/*", async (request, reply) => {

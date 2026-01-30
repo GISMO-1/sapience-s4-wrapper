@@ -8,8 +8,14 @@ import { getTraceIdFromRequest } from "./trace/trace";
 import { parseIntent } from "./intent/intent-parser";
 import { createIntentStore } from "./intent/intent-store";
 import { Intent } from "./intent/intent-model";
+import { createDefaultPolicyEngine } from "./policy/default-policy";
+import { createPolicyStore } from "./policy/policy-store";
+import type { ExecutionMode } from "./policy/policy-types";
+import { buildPolicyExplainResponse } from "./policy/policy-explain";
 
 const intentStore = createIntentStore();
+const policyStore = createPolicyStore();
+const policyEngine = createDefaultPolicyEngine({ confidenceThreshold: config.policyConfidenceThreshold });
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -66,19 +72,26 @@ async function proxyRequest(request: any, reply: any, baseUrl: string, path: str
 
 async function handleIntent(parsed: Intent, traceId: string) {
   const { intent, action } = mapIntentToAction(parsed.intentType);
+  const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+  const policyDecision = policyEngine.evaluate(parsed, { executionMode, traceId });
+  await policyStore.savePolicy(traceId, policyDecision);
 
   let result: unknown = { message: "No action taken" };
 
-  if (action === "requestPurchaseOrder") {
+  if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "requestPurchaseOrder") {
     result = await requestPurchaseOrder(config.procurementUrl, { sku: "AUTO-ITEM", quantity: 10 }, traceId);
-  } else if (action === "fetchInventory") {
+  } else if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "fetchInventory") {
     result = await fetchInventory(config.supplychainUrl, "AUTO-ITEM", traceId);
-  } else if (action === "requestInvoiceReview") {
+  } else if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "requestInvoiceReview") {
     result = await requestInvoiceReview(
       config.financeUrl,
       { invoiceId: "AUTO-INV", amount: 1000 },
       traceId
     );
+  } else if (executionMode === "simulate") {
+    result = { message: "Simulation mode enabled. No downstream actions executed." };
+  } else if (policyDecision.decision === "DENY") {
+    result = { message: "Policy denied execution." };
   }
 
   await intentStore.saveIntent(parsed, traceId);
@@ -88,7 +101,9 @@ async function handleIntent(parsed: Intent, traceId: string) {
     action,
     result,
     traceId,
-    parsedIntent: parsed
+    parsedIntent: parsed,
+    policy: policyDecision,
+    executionMode
   };
 }
 
@@ -97,14 +112,6 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const body = intentSchema.parse(request.body);
     const traceId = getTraceIdFromRequest(request);
     const parsed = parseIntent(body.text);
-    if (parsed.confidence < 0.6) {
-      reply.code(400);
-      return {
-        message:
-          "Intent confidence too low. Provide a request for purchase orders, inventory checks, or invoice reviews.",
-        traceId
-      };
-    }
     return handleIntent(parsed, traceId);
   });
 
@@ -154,6 +161,27 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       intent: stored.intent,
       createdAt: stored.createdAt
     };
+  });
+
+  app.get("/v1/policy/explain/:traceId", async (request, reply) => {
+    const traceId = String((request.params as { traceId: string }).traceId);
+    const storedIntent = await intentStore.getIntentByTraceId(traceId);
+    if (!storedIntent) {
+      reply.code(404);
+      return { message: "Intent not found", traceId };
+    }
+    const policyRecord = await policyStore.getPolicyByTraceId(traceId);
+    const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+    if (!policyRecord) {
+      reply.code(404);
+      return { message: "Policy decision not found", traceId };
+    }
+    return buildPolicyExplainResponse({
+      traceId,
+      intent: storedIntent.intent,
+      policy: policyRecord,
+      executionMode
+    });
   });
 
   app.all("/v1/procurement/*", async (request, reply) => {

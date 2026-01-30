@@ -6,6 +6,7 @@ export const config = {
   port: Number(process.env.PORT ?? 3005),
   serviceName: process.env.SERVICE_NAME ?? "orchestration-service",
   brokerBrokers: (process.env.BROKER_BROKERS ?? "localhost:9092").split(","),
+  executionMode: process.env.EXECUTION_MODE ?? "manual",
   db: {
     host: process.env.DB_HOST ?? "localhost",
     port: Number(process.env.DB_PORT ?? 5432),

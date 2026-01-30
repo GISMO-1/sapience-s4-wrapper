@@ -58,6 +58,7 @@ export class PostgresSagaStore implements SagaStore {
       traceId: row.trace_id,
       sku: row.sku,
       status: row.status,
+      simulated: false,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

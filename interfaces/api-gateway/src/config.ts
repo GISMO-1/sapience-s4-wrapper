@@ -11,6 +11,8 @@ export const config = {
   integrationUrl: process.env.INTEGRATION_URL ?? "http://localhost:3004",
   aiServiceUrl: process.env.AI_SERVICE_URL ?? "http://localhost:8000",
   executeToolCalls: process.env.EXECUTE_TOOL_CALLS === "true",
+  executionMode: process.env.EXECUTION_MODE ?? "manual",
+  policyConfidenceThreshold: Number(process.env.POLICY_CONFIDENCE_THRESHOLD ?? 0.6),
   logLevel: process.env.LOG_LEVEL ?? "info",
   useInMemoryStore: process.env.USE_INMEMORY_STORE === "true",
   db: {

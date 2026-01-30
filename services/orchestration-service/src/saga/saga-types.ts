@@ -5,6 +5,7 @@ export type SagaRecord = {
   traceId: string;
   sku: string;
   status: SagaStatus;
+  simulated?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };

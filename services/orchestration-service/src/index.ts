@@ -17,6 +17,8 @@ import { SagaStatus } from "./saga/saga-types";
 
 const app = Fastify({ logger: false });
 const sagaStore = createSagaStore();
+const executionMode = config.executionMode ?? "manual";
+const isSimulateMode = executionMode === "simulate";
 
 async function start(): Promise<void> {
   await startTelemetry();
@@ -48,7 +50,8 @@ async function start(): Promise<void> {
           sagaId,
           traceId,
           sku: payload.data.sku,
-          status
+          status,
+          simulated: isSimulateMode
         });
 
         await sagaStore.recordEvent({
@@ -80,10 +83,12 @@ async function start(): Promise<void> {
           data: poRequest
         };
 
-        await producer.send({
-          topic: topics.procurementPoRequested,
-          messages: [{ value: JSON.stringify(event) }]
-        });
+        if (!isSimulateMode) {
+          await producer.send({
+            topic: topics.procurementPoRequested,
+            messages: [{ value: JSON.stringify(event) }]
+          });
+        }
 
         await sagaStore.updateSagaStatus(sagaId, "REQUESTED");
         await sagaStore.recordEvent({

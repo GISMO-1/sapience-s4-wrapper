@@ -9,7 +9,8 @@ export const intentSchema = z.object({
       sku: z.string().optional(),
       quantity: z.number().optional(),
       vendor: z.string().optional(),
-      invoiceId: z.string().optional()
+      invoiceId: z.string().optional(),
+      amount: z.number().optional()
     })
     .default({}),
   confidence: z.number().min(0).max(1),

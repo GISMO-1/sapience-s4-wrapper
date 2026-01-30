@@ -8,14 +8,14 @@ import { getTraceIdFromRequest } from "./trace/trace";
 import { parseIntent } from "./intent/intent-parser";
 import { createIntentStore } from "./intent/intent-store";
 import { Intent } from "./intent/intent-model";
-import { createDefaultPolicyEngine } from "./policy/default-policy";
+import { createPolicyEvaluator } from "./policy-code/evaluator";
 import { createPolicyStore } from "./policy/policy-store";
-import type { ExecutionMode } from "./policy/policy-types";
-import { buildPolicyExplainResponse } from "./policy/policy-explain";
+import type { ExecutionMode, PolicyInfo } from "./policy-code/types";
+import { buildPolicyExplainResponse } from "./policy-code/explain";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
-const policyEngine = createDefaultPolicyEngine({ confidenceThreshold: config.policyConfidenceThreshold });
+const policyEvaluator = createPolicyEvaluator();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -73,28 +73,43 @@ async function proxyRequest(request: any, reply: any, baseUrl: string, path: str
 async function handleIntent(parsed: Intent, traceId: string) {
   const { intent, action } = mapIntentToAction(parsed.intentType);
   const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
-  const policyDecision = policyEngine.evaluate(parsed, { executionMode, traceId });
-  await policyStore.savePolicy(traceId, policyDecision);
+  const policyDecision = policyEvaluator.evaluate(parsed, { executionMode, traceId });
+  await policyStore.savePolicyDecision(traceId, policyDecision);
+  await intentStore.saveIntent(parsed, traceId);
+
+  const policySnapshot = policyEvaluator.getPolicySnapshot();
+  const autoRequires = policySnapshot.policy?.defaults.execution.autoRequires ?? ["WARN"];
+  const autoRequiresWarn = autoRequires.includes("WARN") || autoRequires.includes("ALLOW_ONLY");
 
   let result: unknown = { message: "No action taken" };
 
-  if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "requestPurchaseOrder") {
+  if (executionMode === "simulate") {
+    if (policyDecision.final === "DENY" && !policyDecision.simulationAllowed) {
+      result = { message: "Policy denied simulation." };
+    } else {
+      result = { message: "Simulation mode enabled. No downstream actions executed." };
+    }
+  } else if (policyDecision.final === "DENY") {
+    result = { message: "Policy denied execution." };
+  } else if (executionMode === "auto" && policyDecision.final === "WARN" && autoRequiresWarn) {
+    result = {
+      message: "Policy warning requires manual approval.",
+      plan: {
+        intent,
+        action
+      }
+    };
+  } else if (action === "requestPurchaseOrder") {
     result = await requestPurchaseOrder(config.procurementUrl, { sku: "AUTO-ITEM", quantity: 10 }, traceId);
-  } else if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "fetchInventory") {
+  } else if (action === "fetchInventory") {
     result = await fetchInventory(config.supplychainUrl, "AUTO-ITEM", traceId);
-  } else if (policyDecision.decision !== "DENY" && executionMode !== "simulate" && action === "requestInvoiceReview") {
+  } else if (action === "requestInvoiceReview") {
     result = await requestInvoiceReview(
       config.financeUrl,
       { invoiceId: "AUTO-INV", amount: 1000 },
       traceId
     );
-  } else if (executionMode === "simulate") {
-    result = { message: "Simulation mode enabled. No downstream actions executed." };
-  } else if (policyDecision.decision === "DENY") {
-    result = { message: "Policy denied execution." };
   }
-
-  await intentStore.saveIntent(parsed, traceId);
 
   return {
     intent,
@@ -108,7 +123,7 @@ async function handleIntent(parsed: Intent, traceId: string) {
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/v1/intent", async (request, reply) => {
+  app.post("/v1/intent", async (request) => {
     const body = intentSchema.parse(request.body);
     const traceId = getTraceIdFromRequest(request);
     const parsed = parseIntent(body.text);
@@ -176,12 +191,34 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404);
       return { message: "Policy decision not found", traceId };
     }
+
+    const snapshot = policyEvaluator.getPolicySnapshot();
+    const policyInfo: PolicyInfo = {
+      version: snapshot.info.version,
+      hash: policyRecord.policyHash,
+      loadedAt: snapshot.info.hash === policyRecord.policyHash ? snapshot.info.loadedAt : "unknown",
+      path: snapshot.info.path
+    };
+
     return buildPolicyExplainResponse({
       traceId,
       intent: storedIntent.intent,
-      policy: policyRecord,
-      executionMode
+      policyRecord,
+      executionMode,
+      policyInfo
     });
+  });
+
+  app.post("/v1/policy/reload", async (_request, reply) => {
+    if (!config.policyReloadEnabled) {
+      reply.code(403);
+      return { message: "Policy reload disabled." };
+    }
+    const snapshot = policyEvaluator.reloadPolicy();
+    return {
+      policy: snapshot.info,
+      source: snapshot.source
+    };
   });
 
   app.all("/v1/procurement/*", async (request, reply) => {

@@ -1,0 +1,79 @@
+version: "v1"
+defaults:
+  confidenceThreshold: 0.6
+  execution:
+    autoRequires: ["WARN"]
+rules:
+  - id: "confidence-minimum"
+    enabled: true
+    priority: 100
+    appliesTo:
+      intentTypes: ["CREATE_PO", "CHECK_INVENTORY", "REVIEW_INVOICE"]
+    constraints:
+      - type: "CONFIDENCE_MIN"
+        params:
+          min: 0.5
+    decision: "DENY"
+    reason: "Intent confidence is below the minimum required threshold."
+    tags: ["compliance"]
+  - id: "max-invoice-amount"
+    enabled: true
+    priority: 90
+    appliesTo:
+      intentTypes: ["REVIEW_INVOICE"]
+    constraints:
+      - type: "MAX_AMOUNT"
+        params:
+          max: 50000
+    decision: "WARN"
+    reason: "Invoice amount exceeds the auto-review limit."
+    tags: ["finance", "compliance"]
+  - id: "blocked-sku"
+    enabled: true
+    priority: 80
+    appliesTo:
+      intentTypes: ["CREATE_PO", "CHECK_INVENTORY"]
+    constraints:
+      - type: "SKU_BLOCKLIST"
+        params:
+          skus: ["BLOCKED-SKU-1", "BLOCKED-SKU-2"]
+    decision: "DENY"
+    reason: "SKU is on the blocklist."
+    tags: ["ops", "compliance"]
+  - id: "blocked-vendor"
+    enabled: true
+    priority: 70
+    appliesTo:
+      intentTypes: ["CREATE_PO"]
+    constraints:
+      - type: "VENDOR_BLOCKLIST"
+        params:
+          vendors: ["VENDOR-RED", "VENDOR-ORANGE"]
+    decision: "DENY"
+    reason: "Vendor is on the blocklist."
+    tags: ["compliance"]
+  - id: "auto-requires-rate-limit"
+    enabled: true
+    priority: 60
+    appliesTo:
+      intentTypes: ["CREATE_PO"]
+    constraints:
+      - type: "RATE_LIMIT"
+        params:
+          windowSeconds: 60
+          max: 3
+    decision: "WARN"
+    reason: "Rate limit reached for similar purchase order requests."
+    tags: ["ops", "safety"]
+  - id: "simulate-override"
+    enabled: true
+    priority: 10
+    appliesTo:
+      intentTypes: ["CREATE_PO", "CHECK_INVENTORY", "REVIEW_INVOICE"]
+    constraints:
+      - type: "EXECUTION_MODE"
+        params:
+          mode: "simulate"
+    decision: "ALLOW"
+    reason: "Simulation mode is always permitted."
+    tags: ["simulation", "dev"]

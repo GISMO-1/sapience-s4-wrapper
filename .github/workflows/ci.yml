@@ -22,6 +22,8 @@ jobs:
           python-version: "3.11"
       - name: Install Node dependencies
         run: pnpm install
+      - name: Typecheck Node services
+        run: pnpm -r typecheck
       - name: Build Node services
         run: pnpm -r build
       - name: Test Node services

@@ -1,6 +1,6 @@
 # Policy loader
 
-Purpose: Load and validate YAML policy files, cache the last good policy, and provide reload support. Inputs are `policies/policies.v1.yaml` (or `POLICY_PATH`); outputs are validated policy snapshots and metadata.
+Purpose: Load and validate YAML policy files, cache the last good policy, and provide reload support. Inputs are `policies/policies.v1.yaml` (or `POLICY_PATH`) plus optional replay candidates (current/path/inline); outputs are validated policy snapshots and metadata.
 
 Example command:
 ```bash

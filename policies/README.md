@@ -109,6 +109,24 @@ Policies are reloaded in two ways:
 - `SIGHUP` (best-effort).
 - `POST /v1/policy/reload` (only if `POLICY_RELOAD_ENABLED=true`).
 
+## Policy replay (decision-only)
+
+The gateway can replay stored intents against a candidate policy to compare baseline decisions with re-evaluated outcomes. Replay runs are persisted for traceability, along with per-intent diffs and matched rules.
+
+Example: replay with the current loaded policy:
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/replay \\
+  -H 'content-type: application/json' \\
+  -d '{"candidatePolicy":{"source":"current"},"filters":{"limit":50}}' | jq
+```
+
+Example: replay with an inline policy (requires `POLICY_INLINE_ENABLED=true`):
+```bash
+POLICY_INLINE_ENABLED=true curl -s -X POST http://localhost:3000/v1/policy/replay \\
+  -H 'content-type: application/json' \\
+  -d '{"candidatePolicy":{"source":"inline","yaml":"version: \"v1\"\\ndefaults:\\n  confidenceThreshold: 0.7\\n  execution:\\n    autoRequires: [\"WARN\"]\\nrules: []\\n"}}' | jq
+```
+
 ## Safe fallback
 
 If policy loading fails and no cached policy exists, the gateway uses a safe fallback:

@@ -85,9 +85,11 @@ The API gateway loads policy rules from `policies/policies.v1.yaml` and enforces
 curl -s -X POST http://localhost:3000/v1/policy/reload | jq
 ```
 
-Policy replay now includes an executive-ready impact report plus a minimal sandbox UI in the web portal. Use the replay endpoints to compare baseline vs. candidate decisions:
+Policy replay now includes an executive-ready impact report plus a minimal sandbox UI in the web portal. Promotion guardrails score replay impact and enforce blast-radius thresholds before activating new policies. Use the replay and promotion endpoints to compare baseline vs. candidate decisions:
 - `POST /v1/policy/replay` to execute a replay run.
 - `GET /v1/policy/replay/:runId/report` to fetch totals, deltas, and top changes.
+- `POST /v1/policy/promote` to approve and activate a simulated policy.
+- `GET /v1/policy/status` to inspect policy lifecycle status and approvals.
 - `GET /v1/policy/current` to inspect the loaded policy snapshot.
 
 ## Event flow (short)

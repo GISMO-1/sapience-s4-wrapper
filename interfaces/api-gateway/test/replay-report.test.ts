@@ -52,6 +52,7 @@ function buildResult(partial: Partial<ReplayResultRecord>): ReplayResultRecord {
     candidatePolicyHash: partial.candidatePolicyHash ?? "cand-hash",
     baselineMatchedRules: partial.baselineMatchedRules ?? [],
     candidateMatchedRules: partial.candidateMatchedRules ?? [],
+    candidateConstraintTypes: partial.candidateConstraintTypes ?? [],
     reasons: partial.reasons ?? [],
     categories: partial.categories ?? [],
     risk: partial.risk ?? { level: "low", signals: [] },

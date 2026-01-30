@@ -1,4 +1,6 @@
+import { config } from "../config";
 import type { PolicyDecision } from "../policy-code/types";
+import { calculatePolicyImpact } from "../policy-lifecycle/impact";
 import type { ReplayReport, ReplayReportTotals, ReplayResultRecord, ReplayRunRecord } from "./types";
 
 const decisionRank: Record<PolicyDecision, number> = {
@@ -149,6 +151,8 @@ export function buildReport(run: ReplayRunRecord, results: ReplayResultRecord[])
       candidateRules: result.candidateMatchedRules
     }));
 
+  const impact = calculatePolicyImpact(results, config.policyImpact);
+
   return {
     run: {
       runId: run.id,
@@ -174,6 +178,7 @@ export function buildReport(run: ReplayRunRecord, results: ReplayResultRecord[])
     },
     byIntentType,
     topRuleChanges,
-    topChangedExamples
+    topChangedExamples,
+    impact
   };
 }

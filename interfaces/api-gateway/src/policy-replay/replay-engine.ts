@@ -59,9 +59,13 @@ function buildCandidateEvaluation(
   evaluator: ReturnType<typeof buildCandidateEvaluator>
 ): ReplayCandidateEvaluation {
   const decision = evaluator.evaluate(intent.intent, { executionMode, traceId: intent.traceId });
+  const constraintTypes = Array.from(
+    new Set(decision.matchedRules.flatMap((rule) => rule.constraintTypes))
+  ).sort();
   return {
     decision,
     matchedRuleIds: decision.matchedRules.map((rule) => rule.ruleId),
+    constraintTypes,
     reasons: decision.reasons,
     categories: decision.categories,
     risk: decision.risk
@@ -141,6 +145,7 @@ export function createPolicyReplayEngine(store: PolicyReplayStore) {
         candidatePolicyHash: input.candidate.info.hash,
         baselineMatchedRules: intent.baselineMatchedRules,
         candidateMatchedRules: evaluation.matchedRuleIds,
+        candidateConstraintTypes: evaluation.constraintTypes,
         reasons: evaluation.reasons,
         categories: evaluation.categories,
         risk: evaluation.risk,

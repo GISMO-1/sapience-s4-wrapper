@@ -1,5 +1,13 @@
 # Sapience – cloud-native AI wrapper for SAP S/4HANA
 
+[![CI](https://github.com/<ORG>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<ORG>/<REPO>/actions/workflows/ci.yml)
+![License](https://img.shields.io/github/license/<ORG>/<REPO>)
+![Node](https://img.shields.io/badge/node-20.x-green)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+![Architecture](https://img.shields.io/badge/architecture-event--driven-orange)
+![Status](https://img.shields.io/badge/status-active%20development-yellow)
+
 Sapience is a cloud-native wrapper that provides intent-driven APIs and event-driven microservices for SAP S/4HANA. It offers a stable, boringly reliable stack with observability, local dev tooling, and a web portal to validate intent routing quickly.
 
 ## Architecture summary

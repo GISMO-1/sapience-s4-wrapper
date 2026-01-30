@@ -37,6 +37,15 @@ curl -s -X POST http://localhost:3000/v1/intent \
   -d '{"text":"create a PO for laptops"}' | jq
 ```
 
+### AI assist planner (gateway passthrough)
+```bash
+curl -s -X POST http://localhost:3000/v1/assist \
+  -H 'content-type: application/json' \
+  -d '{"text":"review invoice INV-2024"}' | jq
+```
+
+To execute the first tool call via the gateway, set `EXECUTE_TOOL_CALLS=true` for the API gateway container.
+
 ### Procurement: request a purchase order
 ```bash
 curl -s -X POST http://localhost:3001/v1/purchase-orders/request \

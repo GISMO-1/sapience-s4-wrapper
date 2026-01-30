@@ -31,4 +31,4 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r services/ai-service/requirements.txt
       - name: Run Python tests
-        run: python -m pytest services/ai-service/tests
+        run: python -m pytest -q services/ai-service/tests

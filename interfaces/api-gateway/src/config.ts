@@ -9,5 +9,7 @@ export const config = {
   supplychainUrl: process.env.SUPPLYCHAIN_URL ?? "http://localhost:3002",
   financeUrl: process.env.FINANCE_URL ?? "http://localhost:3003",
   integrationUrl: process.env.INTEGRATION_URL ?? "http://localhost:3004",
+  aiServiceUrl: process.env.AI_SERVICE_URL ?? "http://localhost:8000",
+  executeToolCalls: process.env.EXECUTE_TOOL_CALLS === "true",
   logLevel: process.env.LOG_LEVEL ?? "info"
 };

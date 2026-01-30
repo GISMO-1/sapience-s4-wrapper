@@ -232,6 +232,8 @@ services:
       SUPPLYCHAIN_URL: http://supplychain-service:3002
       FINANCE_URL: http://finance-service:3003
       INTEGRATION_URL: http://integration-service:3004
+      AI_SERVICE_URL: http://ai-service:8000
+      EXECUTE_TOOL_CALLS: "false"
       LOG_LEVEL: info
     depends_on:
       procurement-service:

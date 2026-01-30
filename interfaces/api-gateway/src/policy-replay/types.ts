@@ -116,3 +116,53 @@ export type ReplayCandidateEvaluation = {
   categories: string[];
   risk: RiskAssessment;
 };
+
+export type ReplayReportTotals = {
+  count: number;
+  changed: number;
+  unchanged: number;
+  baseline: { allow: number; warn: number; deny: number };
+  candidate: { allow: number; warn: number; deny: number };
+};
+
+export type ReplayReport = {
+  run: {
+    runId: string;
+    createdAt: Date;
+    baseline: { hash: string };
+    candidate: { hash: string; source: ReplayCandidateSource; ref?: string };
+    filters: {
+      intentTypes?: string[];
+      since?: Date;
+      until?: Date;
+      limit: number;
+    };
+  };
+  totals: ReplayReportTotals;
+  deltas: {
+    allowDelta: number;
+    warnDelta: number;
+    denyDelta: number;
+  };
+  byIntentType: Array<{
+    intentType: Intent["intentType"];
+    count: number;
+    changed: number;
+    baseline: { allow: number; warn: number; deny: number };
+    candidate: { allow: number; warn: number; deny: number };
+  }>;
+  topRuleChanges: Array<{
+    ruleId: string;
+    direction: "more_strict" | "less_strict" | "mixed";
+    changedCount: number;
+    examples: Array<{ traceId: string; baselineDecision: PolicyDecision; candidateDecision: PolicyDecision }>;
+  }>;
+  topChangedExamples: Array<{
+    traceId: string;
+    intentType: Intent["intentType"];
+    baselineDecision: PolicyDecision;
+    candidateDecision: PolicyDecision;
+    baselineRules: string[];
+    candidateRules: string[];
+  }>;
+};

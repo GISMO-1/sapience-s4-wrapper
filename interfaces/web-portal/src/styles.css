@@ -76,3 +76,122 @@ button:disabled {
   border: 1px solid #d0d7e2;
   font-size: 1rem;
 }
+
+.policy-sandbox {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e3e7ef;
+}
+
+.sandbox-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #d0d7e2;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sandbox-section h3 {
+  margin-top: 0;
+}
+
+.sandbox-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.sandbox-row input[type="text"],
+.sandbox-row input[type="number"] {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  font-size: 0.95rem;
+}
+
+.sandbox-inline {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.sandbox-inline textarea {
+  width: 100%;
+}
+
+.sandbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sandbox-error {
+  color: #c0392b;
+  font-size: 0.9rem;
+}
+
+.sandbox-report {
+  margin-top: 1.5rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #d0d7e2;
+}
+
+.sandbox-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d0d7e2;
+}
+
+.sandbox-table th,
+.sandbox-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e3e7ef;
+}
+
+.sandbox-table th {
+  background: #f3f6fb;
+}
+
+.sandbox-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sandbox-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sandbox-list button {
+  background: transparent;
+  color: #2f6fed;
+  padding: 0;
+}
+
+.sandbox-pre {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  white-space: pre-wrap;
+}

@@ -120,6 +120,11 @@ curl -s -X POST http://localhost:3000/v1/policy/replay \\
   -d '{"candidatePolicy":{"source":"current"},"filters":{"limit":50}}' | jq
 ```
 
+Example: fetch the replay impact report for a run:
+```bash
+curl -s http://localhost:3000/v1/policy/replay/RUN_ID/report | jq
+```
+
 Example: replay with an inline policy (requires `POLICY_INLINE_ENABLED=true`):
 ```bash
 POLICY_INLINE_ENABLED=true curl -s -X POST http://localhost:3000/v1/policy/replay \\

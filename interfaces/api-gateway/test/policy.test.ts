@@ -193,6 +193,30 @@ test("policy explain endpoint returns policy metadata", async () => {
   await app.close();
 });
 
+test("policy current endpoint returns snapshot metadata", async () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "policy-current-"));
+  const policyPath = path.join(tempDir, "policies.v1.yaml");
+  writeFileSync(
+    policyPath,
+    "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.5\n  execution:\n    autoRequires: [\"WARN\"]\nrules: []\n"
+  );
+  process.env.POLICY_PATH = policyPath;
+  const app = await buildApp();
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/policy/current"
+  });
+
+  expect(response.statusCode).toBe(200);
+  const payload = response.json();
+  expect(payload.version).toBe("v1");
+  expect(payload.hash).toBeDefined();
+  expect(payload.path).toBe(policyPath);
+
+  await app.close();
+});
+
 test("policy decision persistence is invoked", async () => {
   const policyStoreModule = await import("../src/policy/policy-store");
   const policyStoreSpy = vi.spyOn(policyStoreModule, "createPolicyStore");

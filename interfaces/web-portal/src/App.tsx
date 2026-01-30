@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { sendIntent } from "./api";
+import { PolicySandbox } from "./PolicySandbox";
 import { TraceViewer } from "./TraceViewer";
 
 export function App() {
@@ -45,6 +46,7 @@ export function App() {
         <h2>Response</h2>
         <pre>{response || "No response yet."}</pre>
       </section>
+      <PolicySandbox />
       <TraceViewer />
     </div>
   );

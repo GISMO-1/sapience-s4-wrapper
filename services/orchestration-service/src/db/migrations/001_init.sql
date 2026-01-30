@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS sagas (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  sku TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);

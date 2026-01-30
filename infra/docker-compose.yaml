@@ -1,0 +1,170 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sapience
+      POSTGRES_PASSWORD: sapience
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.5
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --kafka-addr
+      - 0.0.0.0:9092
+      - --advertise-kafka-addr
+      - redpanda:9092
+    ports:
+      - "9092:9092"
+
+  integration-service:
+    build: ../services/integration-service
+    environment:
+      PORT: 3004
+      SERVICE_NAME: integration-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: integration
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "3004:3004"
+
+  procurement-service:
+    build: ../services/procurement-service
+    environment:
+      PORT: 3001
+      SERVICE_NAME: procurement-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: procurement
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "3001:3001"
+
+  supplychain-service:
+    build: ../services/supplychain-service
+    environment:
+      PORT: 3002
+      SERVICE_NAME: supplychain-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: supplychain
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "3002:3002"
+
+  finance-service:
+    build: ../services/finance-service
+    environment:
+      PORT: 3003
+      SERVICE_NAME: finance-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: finance
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "3003:3003"
+
+  orchestration-service:
+    build: ../services/orchestration-service
+    environment:
+      PORT: 3005
+      SERVICE_NAME: orchestration-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: orchestration
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "3005:3005"
+
+  ai-service:
+    build: ../services/ai-service
+    environment:
+      PORT: 8000
+      SERVICE_NAME: ai-service
+      BROKER_BROKERS: redpanda:9092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sapience
+      DB_PASSWORD: sapience
+      DB_NAME: ai
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redpanda
+    ports:
+      - "8000:8000"
+
+  api-gateway:
+    build: ../interfaces/api-gateway
+    environment:
+      PORT: 3000
+      SERVICE_NAME: api-gateway
+      PROCUREMENT_URL: http://procurement-service:3001
+      SUPPLYCHAIN_URL: http://supplychain-service:3002
+      FINANCE_URL: http://finance-service:3003
+      INTEGRATION_URL: http://integration-service:3004
+      LOG_LEVEL: info
+    depends_on:
+      - procurement-service
+      - supplychain-service
+      - finance-service
+      - integration-service
+    ports:
+      - "3000:3000"
+
+  web-portal:
+    build: ../interfaces/web-portal
+    environment:
+      VITE_API_BASE_URL: http://api-gateway:3000
+    depends_on:
+      - api-gateway
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:

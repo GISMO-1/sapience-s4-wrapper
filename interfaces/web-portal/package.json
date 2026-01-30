@@ -1,0 +1,31 @@
+{
+  "name": "web-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "test": "vitest run",
+    "lint": "echo 'lint skipped'"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.6",
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^24.1.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.4",
+    "vitest": "^1.6.0"
+  },
+  "vitest": {
+    "environment": "jsdom",
+    "globals": true
+  }
+}

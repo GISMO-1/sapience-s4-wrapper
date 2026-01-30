@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS invoice_reviews (
+  id TEXT PRIMARY KEY,
+  amount NUMERIC NOT NULL,
+  status TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS accruals (
+  id TEXT PRIMARY KEY,
+  sku TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);

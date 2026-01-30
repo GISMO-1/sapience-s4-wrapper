@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY,
+  sku TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);

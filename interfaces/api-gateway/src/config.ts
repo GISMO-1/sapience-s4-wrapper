@@ -12,7 +12,7 @@ export const config = {
   aiServiceUrl: process.env.AI_SERVICE_URL ?? "http://localhost:8000",
   executeToolCalls: process.env.EXECUTE_TOOL_CALLS === "true",
   executionMode: process.env.EXECUTION_MODE ?? "manual",
-  policyConfidenceThreshold: Number(process.env.POLICY_CONFIDENCE_THRESHOLD ?? 0.6),
+  policyReloadEnabled: process.env.POLICY_RELOAD_ENABLED === "true",
   logLevel: process.env.LOG_LEVEL ?? "info",
   useInMemoryStore: process.env.USE_INMEMORY_STORE === "true",
   db: {

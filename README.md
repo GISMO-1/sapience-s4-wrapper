@@ -78,6 +78,13 @@ curl -s -X POST http://localhost:3003/v1/invoices/review-request \
 curl -s http://localhost:3004/v1/sap/purchase-orders/PO-1001 | jq
 ```
 
+## Policy-as-Code
+The API gateway loads policy rules from `policies/policies.v1.yaml` and enforces deterministic, explainable decisions. The `/v1/policy/explain/:traceId` endpoint returns the policy hash alongside the decision, matched rules, and risk signals. To reload policies locally, set `POLICY_RELOAD_ENABLED=true` and call:
+
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/reload | jq
+```
+
 ## Event flow (short)
 1. Domain services publish intent events (ex: `sapience.procurement.po.requested`).
 2. The integration service receives intent events, calls the SAP adapter (currently fake), and publishes completion events (ex: `sapience.integration.po.created`).

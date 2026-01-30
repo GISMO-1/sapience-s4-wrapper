@@ -1,20 +1,13 @@
 # API Gateway
 
-## Purpose
-Routes intent requests to domain services and proxies domain-specific APIs.
+Purpose: Route intents, apply policy evaluation, and proxy requests to domain services. Inputs are HTTP requests; outputs are policy-enforced responses and explainable traces.
 
-## Inputs/Outputs
-- Inputs: REST requests from clients.
-- Outputs: Normalized intent responses and proxied responses.
-
-## Example
+Example command:
 ```bash
-curl -s -X POST http://localhost:3000/v1/intent \
-  -H 'content-type: application/json' \
-  -d '{"text":"check inventory for widgets"}'
+pnpm --filter api-gateway dev
 ```
 
-## Self-check
+Self-check:
 ```bash
 pnpm --filter api-gateway test
 ```

@@ -24,6 +24,9 @@ import { createPolicyOutcomeStore } from "./policy-outcomes/store";
 import type { PolicyOutcomeRecord } from "./policy-outcomes/types";
 import { calculatePolicyQuality } from "./policy-quality/score";
 import { buildPolicyDriftReport, defaultDriftWindow } from "./policy-drift/compute";
+import { createIntentApprovalStore } from "./intent-approvals/store";
+import type { IntentApprovalRecord } from "./intent-approvals/types";
+import { logger } from "./logger";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -33,6 +36,7 @@ const replayEngine = createPolicyReplayEngine(replayStore);
 const lifecycleStore = createPolicyLifecycleStore();
 const lineageStore = createPolicyLineageStore();
 const outcomeStore = createPolicyOutcomeStore();
+const approvalStore = createIntentApprovalStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -108,6 +112,17 @@ const outcomeListQuerySchema = z.object({
   limit: z.string().optional()
 });
 
+const approvalRequestSchema = z.object({
+  role: z.string().min(1),
+  actor: z.string().min(1),
+  rationale: z.string().min(1)
+});
+
+const executeRequestSchema = z.object({
+  actor: z.string().min(1).optional(),
+  rationale: z.string().min(1).optional()
+});
+
 const policyQualityQuerySchema = z.object({
   policyHash: z.string().min(1),
   since: z.string().datetime().optional(),
@@ -138,6 +153,53 @@ function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; 
     default:
       return { intent: "unknown", action: "noop" };
   }
+}
+
+const DEFAULT_ACTOR = "local-user";
+const DEFAULT_MANUAL_RATIONALE =
+  "Manual execution approval recorded with placeholder actor. TODO: replace with real auth.";
+
+function buildExecutionPlan(parsed: Intent) {
+  const { intent, action } = mapIntentToAction(parsed.intentType);
+  return { intent, action };
+}
+
+function serializeApproval(approval: IntentApprovalRecord) {
+  return {
+    id: approval.id,
+    traceId: approval.traceId,
+    intentId: approval.intentId,
+    policyHash: approval.policyHash,
+    decisionId: approval.decisionId,
+    requiredRole: approval.requiredRole,
+    actor: approval.actor,
+    rationale: approval.rationale,
+    approvedAt: approval.approvedAt.toISOString()
+  };
+}
+
+function buildDecisionSummary(decision: ReturnType<typeof policyEvaluator.evaluate>) {
+  return {
+    outcome: decision.final,
+    requiredApprovals: decision.requiredApprovals,
+    reasons: decision.reasons,
+    matchedRuleIds: decision.matchedRules.map((rule) => rule.ruleId)
+  };
+}
+
+async function evaluateAndStoreDecision(parsed: Intent, traceId: string) {
+  const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+  const policyDecision = policyEvaluator.evaluate(parsed, { executionMode, traceId });
+  const existing = await policyStore.getPolicyByTraceId(traceId);
+  if (
+    existing &&
+    existing.policyHash === policyDecision.policy.hash &&
+    existing.decision === policyDecision.final
+  ) {
+    return { executionMode, policyDecision, policyRecord: existing };
+  }
+  const policyRecord = await policyStore.savePolicyDecision(traceId, policyDecision);
+  return { executionMode, policyDecision, policyRecord };
 }
 
 function serializeOutcome(outcome: PolicyOutcomeRecord) {
@@ -175,13 +237,52 @@ async function proxyRequest(request: any, reply: any, baseUrl: string, path: str
   reply.code(response.status).send(data);
 }
 
-async function handleIntent(parsed: Intent, traceId: string) {
-  const { intent, action } = mapIntentToAction(parsed.intentType);
-  const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
-  const policyDecision = policyEvaluator.evaluate(parsed, { executionMode, traceId });
-  await policyStore.savePolicyDecision(traceId, policyDecision);
+async function planIntent(parsed: Intent, traceId: string) {
+  const plan = buildExecutionPlan(parsed);
+  const { executionMode, policyDecision, policyRecord } = await evaluateAndStoreDecision(parsed, traceId);
   await intentStore.saveIntent(parsed, traceId);
 
+  return {
+    intent: plan.intent,
+    action: plan.action,
+    plan,
+    traceId,
+    parsedIntent: parsed,
+    policy: policyDecision,
+    policyRecord,
+    executionMode
+  };
+}
+
+async function notifyOrchestrationExecution(traceId: string, decisionId: string, policyHash: string) {
+  const payload = {
+    traceId,
+    decision: {
+      policyHash,
+      decisionId
+    }
+  };
+  try {
+    await fetch(`${config.orchestrationUrl}/v1/intent/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-trace-id": traceId },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    logger.warn({ error, traceId }, "Failed to notify orchestration execution");
+  }
+}
+
+async function executeIntentAction(input: {
+  parsed: Intent;
+  traceId: string;
+  policyDecision: ReturnType<typeof policyEvaluator.evaluate>;
+  executionMode: ExecutionMode;
+  policyRecordId: string;
+  policyHash: string;
+}) {
+  const { parsed, traceId, policyDecision, executionMode } = input;
+  const plan = buildExecutionPlan(parsed);
   const policySnapshot = policyEvaluator.getPolicySnapshot();
   const autoRequires = policySnapshot.policy?.defaults.execution.autoRequires ?? ["WARN"];
   const autoRequiresWarn = autoRequires.includes("WARN") || autoRequires.includes("ALLOW_ONLY");
@@ -199,16 +300,13 @@ async function handleIntent(parsed: Intent, traceId: string) {
   } else if (executionMode === "auto" && policyDecision.final === "WARN" && autoRequiresWarn) {
     result = {
       message: "Policy warning requires manual approval.",
-      plan: {
-        intent,
-        action
-      }
+      plan
     };
-  } else if (action === "requestPurchaseOrder") {
+  } else if (plan.action === "requestPurchaseOrder") {
     result = await requestPurchaseOrder(config.procurementUrl, { sku: "AUTO-ITEM", quantity: 10 }, traceId);
-  } else if (action === "fetchInventory") {
+  } else if (plan.action === "fetchInventory") {
     result = await fetchInventory(config.supplychainUrl, "AUTO-ITEM", traceId);
-  } else if (action === "requestInvoiceReview") {
+  } else if (plan.action === "requestInvoiceReview") {
     result = await requestInvoiceReview(
       config.financeUrl,
       { invoiceId: "AUTO-INV", amount: 1000 },
@@ -216,15 +314,107 @@ async function handleIntent(parsed: Intent, traceId: string) {
     );
   }
 
+  await notifyOrchestrationExecution(traceId, input.policyRecordId, input.policyHash);
+
   return {
-    intent,
-    action,
+    intent: plan.intent,
+    action: plan.action,
     result,
     traceId,
     parsedIntent: parsed,
     policy: policyDecision,
     executionMode
   };
+}
+
+function findMissingApprovals(input: {
+  requiredApprovals: Array<{ role: string }>;
+  approvals: IntentApprovalRecord[];
+  policyHash: string;
+  decisionId: string;
+}) {
+  const approvedRoles = new Set(
+    input.approvals
+      .filter(
+        (approval) =>
+          approval.policyHash === input.policyHash && approval.decisionId === input.decisionId
+      )
+      .map((approval) => approval.requiredRole)
+  );
+
+  return input.requiredApprovals
+    .map((approval) => approval.role)
+    .filter((role) => !approvedRoles.has(role));
+}
+
+async function executeIntentWithGating(input: {
+  traceId: string;
+  parsedIntent?: Intent;
+  actor?: string;
+  rationale?: string;
+}) {
+  const storedIntent = input.parsedIntent
+    ? await intentStore.saveIntent(input.parsedIntent, input.traceId)
+    : await intentStore.getIntentByTraceId(input.traceId);
+  if (!storedIntent) {
+    return { status: 404, body: { message: "Intent not found", traceId: input.traceId } };
+  }
+
+  const { executionMode, policyDecision, policyRecord } = await evaluateAndStoreDecision(
+    storedIntent.intent,
+    input.traceId
+  );
+  const plan = buildExecutionPlan(storedIntent.intent);
+
+  if (config.executionGatingEnabled && policyDecision.requiredApprovals.length > 0) {
+    const approvals = await approvalStore.listApprovalsByTraceId(input.traceId);
+    const missingApprovals = findMissingApprovals({
+      requiredApprovals: policyDecision.requiredApprovals,
+      approvals,
+      policyHash: policyRecord.policyHash,
+      decisionId: policyRecord.id
+    });
+
+    if (missingApprovals.length > 0 && executionMode === "auto") {
+      return {
+        status: 409,
+        body: {
+          missingApprovals,
+          decision: buildDecisionSummary(policyDecision),
+          plan
+        }
+      };
+    }
+
+    if (missingApprovals.length > 0 && executionMode === "manual") {
+      const actor = input.actor?.trim() || DEFAULT_ACTOR;
+      const rationale = input.rationale?.trim() || DEFAULT_MANUAL_RATIONALE;
+      await Promise.all(
+        missingApprovals.map((role) =>
+          approvalStore.recordApproval({
+            traceId: input.traceId,
+            intentId: storedIntent.id,
+            policyHash: policyRecord.policyHash,
+            decisionId: policyRecord.id,
+            requiredRole: role,
+            actor,
+            rationale
+          })
+        )
+      );
+    }
+  }
+
+  const result = await executeIntentAction({
+    parsed: storedIntent.intent,
+    traceId: input.traceId,
+    policyDecision,
+    executionMode,
+    policyRecordId: policyRecord.id,
+    policyHash: policyRecord.policyHash
+  });
+
+  return { status: 200, body: result };
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -240,7 +430,19 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const body = intentSchema.parse(request.body);
     const traceId = getTraceIdFromRequest(request);
     const parsed = parseIntent(body.text);
-    return handleIntent(parsed, traceId);
+    const planned = await planIntent(parsed, traceId);
+    if (config.executionGatingEnabled) {
+      const { policyRecord, ...response } = planned;
+      return response;
+    }
+    return executeIntentAction({
+      parsed,
+      traceId,
+      policyDecision: planned.policy,
+      executionMode: planned.executionMode,
+      policyRecordId: planned.policyRecord.id,
+      policyHash: planned.policyRecord.policyHash
+    });
   });
 
   app.post("/v1/assist", async (request) => {
@@ -256,7 +458,20 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
     if (config.executeToolCalls && toolCall?.endpoint === "/v1/intent") {
       const text = typeof toolCall.payload.text === "string" ? toolCall.payload.text : body.text;
-      const executed = await handleIntent(parseIntent(text), traceId);
+      const parsedIntent = parseIntent(text);
+      if (config.executionGatingEnabled) {
+        const executed = await executeIntentWithGating({ traceId, parsedIntent });
+        return { ...payload, executed: executed.body, executedStatus: executed.status };
+      }
+      const planned = await planIntent(parsedIntent, traceId);
+      const executed = await executeIntentAction({
+        parsed: parsedIntent,
+        traceId,
+        policyDecision: planned.policy,
+        executionMode: planned.executionMode,
+        policyRecordId: planned.policyRecord.id,
+        policyHash: planned.policyRecord.policyHash
+      });
       return { ...payload, executed };
     }
 
@@ -289,6 +504,76 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       intent: stored.intent,
       createdAt: stored.createdAt
     };
+  });
+
+  app.get("/v1/intent/:traceId/decision", async (request, reply) => {
+    const traceId = String((request.params as { traceId: string }).traceId);
+    const stored = await intentStore.getIntentByTraceId(traceId);
+    if (!stored) {
+      reply.code(404);
+      return { message: "Intent not found", traceId };
+    }
+
+    const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+    const policyDecision = policyEvaluator.evaluate(stored.intent, { executionMode, traceId });
+    const plan = buildExecutionPlan(stored.intent);
+
+    return {
+      traceId,
+      intent: stored.intent,
+      policyHash: policyDecision.policy.hash,
+      decision: buildDecisionSummary(policyDecision),
+      plan
+    };
+  });
+
+  app.post("/v1/intent/:traceId/approve", async (request, reply) => {
+    const traceId = String((request.params as { traceId: string }).traceId);
+    const body = approvalRequestSchema.parse(request.body ?? {});
+    const storedIntent = await intentStore.getIntentByTraceId(traceId);
+    if (!storedIntent) {
+      reply.code(404);
+      return { message: "Intent not found", traceId };
+    }
+
+    const { policyDecision, policyRecord } = await evaluateAndStoreDecision(storedIntent.intent, traceId);
+    const requiredRoles = new Set(policyDecision.requiredApprovals.map((approval) => approval.role));
+    if (!requiredRoles.has(body.role)) {
+      reply.code(400);
+      return {
+        message: "Approval role not required for the current decision.",
+        traceId,
+        requiredApprovals: policyDecision.requiredApprovals
+      };
+    }
+
+    await approvalStore.recordApproval({
+      traceId,
+      intentId: storedIntent.id,
+      policyHash: policyRecord.policyHash,
+      decisionId: policyRecord.id,
+      requiredRole: body.role,
+      actor: body.actor,
+      rationale: body.rationale
+    });
+
+    const approvals = await approvalStore.listApprovalsByTraceId(traceId);
+    return {
+      ok: true,
+      approvals: approvals.map(serializeApproval)
+    };
+  });
+
+  app.post("/v1/intent/:traceId/execute", async (request, reply) => {
+    const traceId = String((request.params as { traceId: string }).traceId);
+    const body = executeRequestSchema.parse(request.body ?? {});
+    const executed = await executeIntentWithGating({
+      traceId,
+      actor: body.actor,
+      rationale: body.rationale
+    });
+    reply.code(executed.status);
+    return executed.body;
   });
 
   app.get("/v1/policy/explain/:traceId", async (request, reply) => {

@@ -8,6 +8,7 @@ import type {
   PolicyReason,
   RiskAssessment
 } from "./types";
+import { deriveRequiredApprovals } from "./approvals";
 
 export type RateLimiter = {
   isLimited: (key: string, windowSeconds: number, max: number) => boolean;
@@ -89,6 +90,12 @@ function buildFallbackDecision(context: PolicyEvaluationContext, snapshot: Polic
     tags: ["defaults"],
     constraintTypes: []
   };
+  const requiredApprovals = deriveRequiredApprovals({
+    matchedRules: [match],
+    executionMode: context.executionMode,
+    defaults: snapshot.policy?.defaults,
+    finalDecision: decision
+  });
   return {
     final: decision,
     matchedRules: [match],
@@ -103,7 +110,8 @@ function buildFallbackDecision(context: PolicyEvaluationContext, snapshot: Polic
     risk,
     executionMode: context.executionMode,
     policy: snapshot.info,
-    simulationAllowed: context.executionMode === "simulate"
+    simulationAllowed: context.executionMode === "simulate",
+    requiredApprovals
   };
 }
 
@@ -217,6 +225,13 @@ export function createPolicyEvaluator(options?: {
           match.decision !== "DENY"
       );
 
+    const requiredApprovals = deriveRequiredApprovals({
+      matchedRules,
+      executionMode: context.executionMode,
+      defaults: policy.defaults,
+      finalDecision
+    });
+
     return {
       final: finalDecision,
       matchedRules,
@@ -225,7 +240,8 @@ export function createPolicyEvaluator(options?: {
       risk,
       executionMode: context.executionMode,
       policy: snapshot.info,
-      simulationAllowed
+      simulationAllowed,
+      requiredApprovals
     };
   };
 

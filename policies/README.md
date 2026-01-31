@@ -43,6 +43,22 @@ The defaults block is applied before rule evaluation:
 - `confidenceThreshold` denies intents with a confidence lower than the threshold.
 - If execution mode is `auto` and risk is `high`, the decision becomes `WARN` or `DENY` depending on `defaults.execution.autoRequires`.
 
+## Required approvals
+
+Policy evaluation emits a deterministic `requiredApprovals` list based on matched rule tags and execution defaults. The gateway maps tags to approval roles as follows:
+
+- `finance` → `FINANCE_REVIEWER`
+- `compliance` → `COMPLIANCE_REVIEWER`
+- `ops` → `OPS_REVIEWER`
+- `safety` → `SAFETY_REVIEWER`
+- `defaults` → `POLICY_REVIEWER`
+- `dev` → `DEV_REVIEWER`
+- `simulation` → `SIMULATION_REVIEWER`
+
+If execution mode is `auto` and the final decision is `WARN`, the gateway adds `AUTO_EXECUTION_REVIEWER` when `defaults.execution.autoRequires` contains `WARN` or `ALLOW_ONLY`.
+
+Each required approval includes the matched rule reason to keep decisions deterministic and audit-friendly.
+
 ## Constraint examples
 
 ### CONFIDENCE_MIN

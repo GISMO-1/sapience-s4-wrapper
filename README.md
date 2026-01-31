@@ -21,6 +21,8 @@ pnpm -r build
 pnpm -r test
 ```
 
+To enable execution gating (two-phase approve/execute) in the API gateway, set `EXECUTION_GATING_ENABLED=true`.
+
 Docker (compose):
 ```bash
 docker compose -f infra/docker-compose.yaml up --build

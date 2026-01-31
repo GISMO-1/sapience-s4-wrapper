@@ -45,6 +45,74 @@ export async function fetchTraceExplain(traceId: string) {
   return response.json();
 }
 
+export type RequiredApproval = {
+  role: string;
+  reason: string;
+};
+
+export type IntentDecisionResponse = {
+  traceId: string;
+  intent: {
+    intentType: string;
+    entities: Record<string, unknown>;
+    confidence: number;
+    rawText: string;
+  };
+  policyHash: string;
+  decision: {
+    outcome: "ALLOW" | "WARN" | "DENY";
+    requiredApprovals: RequiredApproval[];
+    reasons: Array<{ ruleId: string; decision: string; reason: string }>;
+    matchedRuleIds: string[];
+  };
+  plan?: {
+    intent: string;
+    action: string;
+  };
+};
+
+export type IntentApprovalResponse = {
+  ok: true;
+  approvals: Array<{
+    id: string;
+    traceId: string;
+    intentId: string;
+    policyHash: string;
+    decisionId: string;
+    requiredRole: string;
+    actor: string;
+    rationale: string;
+    approvedAt: string;
+  }>;
+};
+
+export async function fetchIntentDecision(traceId: string): Promise<IntentDecisionResponse> {
+  return fetchJson(buildUrl(`/v1/intent/${encodeURIComponent(traceId)}/decision`));
+}
+
+export async function approveIntent(
+  traceId: string,
+  payload: { role: string; actor: string; rationale: string }
+): Promise<IntentApprovalResponse> {
+  return fetchJson(buildUrl(`/v1/intent/${encodeURIComponent(traceId)}/approve`), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function executeIntent(traceId: string, payload?: { actor?: string; rationale?: string }) {
+  const response = await fetch(buildUrl(`/v1/intent/${encodeURIComponent(traceId)}/execute`), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: payload ? JSON.stringify(payload) : undefined
+  });
+  const text = await response.text();
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") && text ? JSON.parse(text) : text;
+  return { ok: response.ok, status: response.status, data };
+}
+
 export type ReplayCandidateSource = "current" | "path" | "inline";
 
 export type PolicyImpactReport = {

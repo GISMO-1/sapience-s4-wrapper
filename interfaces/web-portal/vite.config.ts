@@ -7,7 +7,13 @@ export default defineConfig(({ command, mode }) => ({
     command === "serve" && mode !== "test"
       ? {
           port: 5173,
-          host: "0.0.0.0"
+          host: "0.0.0.0",
+          proxy: {
+            "/v1": {
+              target: process.env.VITE_API_BASE || "http://localhost:8080",
+              changeOrigin: true
+            }
+          }
         }
       : undefined,
   test: {

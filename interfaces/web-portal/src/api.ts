@@ -1,9 +1,24 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
-
-const API_ROOT = API_BASE || window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const NORMALIZED_API_BASE = API_BASE.replace(/\/$/, "");
 
 function buildUrl(path: string) {
-  return `${API_ROOT}${path}`;
+  if (!NORMALIZED_API_BASE) {
+    return path;
+  }
+  return `${NORMALIZED_API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+async function fetchJson<T>(url: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  const contentType = res.headers.get("content-type") || "";
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  if (!contentType.includes("application/json")) {
+    throw new Error(`Expected JSON, got ${contentType || "unknown"}: ${text.slice(0, 200)}`);
+  }
+  return JSON.parse(text) as T;
 }
 
 export async function sendIntent(text: string) {
@@ -109,32 +124,26 @@ export type ReplayReport = {
   };
 };
 
+export type PolicyReplayResponse = {
+  run: {
+    runId: string;
+  };
+};
+
 export async function runPolicyReplay(payload: {
   candidatePolicy?: { source: ReplayCandidateSource; ref?: string; yaml?: string };
   filters?: { limit?: number; intentTypes?: string[] };
   requestedBy?: string;
-}) {
-  const response = await fetch(buildUrl("/v1/policy/replay"), {
+}): Promise<PolicyReplayResponse> {
+  return fetchJson<PolicyReplayResponse>(buildUrl("/v1/policy/replay"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!response.ok) {
-    throw new Error("Policy replay request failed");
-  }
-
-  return response.json();
 }
 
 export async function fetchReplayReport(runId: string): Promise<ReplayReport> {
-  const response = await fetch(buildUrl(`/v1/policy/replay/${encodeURIComponent(runId)}/report`));
-
-  if (!response.ok) {
-    throw new Error("Replay report request failed");
-  }
-
-  return response.json();
+  return fetchJson(buildUrl(`/v1/policy/replay/${encodeURIComponent(runId)}/report`));
 }
 
 export async function promotePolicy(payload: {
@@ -195,19 +204,11 @@ export type PolicyLineageResponse = {
 };
 
 export async function fetchPolicyLineageCurrent(): Promise<PolicyLineageResponse> {
-  const response = await fetch(buildUrl("/v1/policy/lineage/current"));
-  if (!response.ok) {
-    throw new Error("Policy lineage request failed");
-  }
-  return response.json();
+  return fetchJson(buildUrl("/v1/policy/lineage/current"));
 }
 
 export async function fetchPolicyLineageByHash(policyHash: string): Promise<PolicyLineageResponse> {
-  const response = await fetch(buildUrl(`/v1/policy/lineage/${encodeURIComponent(policyHash)}`));
-  if (!response.ok) {
-    throw new Error("Policy lineage request failed");
-  }
-  return response.json();
+  return fetchJson(buildUrl(`/v1/policy/lineage/${encodeURIComponent(policyHash)}`));
 }
 
 export type PolicyOutcomeType = "success" | "failure" | "override" | "rollback";
@@ -232,25 +233,13 @@ export async function recordPolicyOutcome(payload: {
   humanOverride?: boolean;
   notes?: string;
 }) {
-  const response = await fetch(buildUrl("/v1/policy/outcomes"), {
+  return fetchJson(buildUrl("/v1/policy/outcomes"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!response.ok) {
-    const errorPayload = await response.json().catch(() => ({}));
-    const message = typeof errorPayload.message === "string" ? errorPayload.message : "Outcome recording failed";
-    throw new Error(message);
-  }
-
-  return response.json();
 }
 
 export async function fetchPolicyQuality(policyHash: string): Promise<PolicyQualityResponse> {
-  const response = await fetch(buildUrl(`/v1/policy/quality?policyHash=${encodeURIComponent(policyHash)}`));
-  if (!response.ok) {
-    throw new Error("Policy quality request failed");
-  }
-  return response.json();
+  return fetchJson(buildUrl(`/v1/policy/quality?policyHash=${encodeURIComponent(policyHash)}`));
 }

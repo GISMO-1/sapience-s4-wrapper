@@ -419,7 +419,7 @@ test("policy impact simulation renders blast radius summary", async () => {
 
   const impactHeading = await screen.findByRole("heading", { name: /Policy Impact Simulation/i });
   const impactCard = impactHeading.closest(".sandbox-card");
-  if (!impactCard) {
+  if (!(impactCard instanceof HTMLElement)) {
     throw new Error("Impact card not found");
   }
   const impactScope = within(impactCard);

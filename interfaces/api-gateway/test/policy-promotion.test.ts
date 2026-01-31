@@ -86,12 +86,18 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   delete process.env.POLICY_PATH;
+  delete process.env.PROMOTION_GUARDRAILS_ENABLED;
 });
 
 test("policy promotion succeeds when guardrails are within limits", async () => {
   process.env.POLICY_PATH = writeTempPolicy(
     "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.5\n  execution:\n    autoRequires: [\"WARN\"]\nrules: []\n"
   );
+  process.env.PROMOTION_GUARDRAILS_ENABLED = "false";
+  const { config } = await import("../src/config");
+  config.promotionGuardrails.enabled = false;
+  const { loadPolicyFromSource } = await import("../src/policy-code/loader");
+  const currentPolicy = loadPolicyFromSource({ source: "current" });
   replayStore = new InMemoryPolicyReplayStore();
   lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
   lineageStore = new InMemoryPolicyLineageStore();
@@ -99,7 +105,7 @@ test("policy promotion succeeds when guardrails are within limits", async () => 
   const run = await replayStore.createRun({
     requestedBy: "tester",
     baselinePolicyHash: "base-hash",
-    candidatePolicyHash: "cand-hash",
+    candidatePolicyHash: currentPolicy.info.hash,
     candidatePolicySource: "current",
     candidatePolicyRef: null,
     intentTypeFilter: null,
@@ -108,7 +114,9 @@ test("policy promotion succeeds when guardrails are within limits", async () => 
     limit: 10
   });
 
-  await replayStore.saveResults(run.id, [buildResult("res-1", { runId: run.id })]);
+  await replayStore.saveResults(run.id, [
+    buildResult("res-1", { runId: run.id, candidatePolicyHash: currentPolicy.info.hash })
+  ]);
 
   const app = await buildApp();
   const response = await app.inject({
@@ -126,7 +134,7 @@ test("policy promotion succeeds when guardrails are within limits", async () => 
 
   expect(response.statusCode).toBe(200);
   const payload = response.json();
-  expect(payload.promoted.policyHash).toBe("cand-hash");
+  expect(payload.promoted.policyHash).toBe(currentPolicy.info.hash);
   expect(payload.promoted.state).toBe("active");
   expect(payload.promoted.approval.approvedBy).toBe("Reviewer");
 
@@ -137,6 +145,11 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
   process.env.POLICY_PATH = writeTempPolicy(
     "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.5\n  execution:\n    autoRequires: [\"WARN\"]\nrules: []\n"
   );
+  process.env.PROMOTION_GUARDRAILS_ENABLED = "false";
+  const { config } = await import("../src/config");
+  config.promotionGuardrails.enabled = false;
+  const { loadPolicyFromSource } = await import("../src/policy-code/loader");
+  const currentPolicy = loadPolicyFromSource({ source: "current" });
   replayStore = new InMemoryPolicyReplayStore();
   lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
   lineageStore = new InMemoryPolicyLineageStore();
@@ -144,7 +157,7 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
   const run = await replayStore.createRun({
     requestedBy: "tester",
     baselinePolicyHash: "base-hash",
-    candidatePolicyHash: "cand-hash",
+    candidatePolicyHash: currentPolicy.info.hash,
     candidatePolicySource: "current",
     candidatePolicyRef: null,
     intentTypeFilter: null,
@@ -154,7 +167,7 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
   });
 
   const results = Array.from({ length: 30 }, (_, index) =>
-    buildResult(`res-${index}`, { runId: run.id })
+    buildResult(`res-${index}`, { runId: run.id, candidatePolicyHash: currentPolicy.info.hash })
   );
   await replayStore.saveResults(run.id, results);
 
@@ -179,24 +192,40 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
 });
 
 test("policy promotion rejects payloads without rationale or accepted risk", async () => {
+  process.env.POLICY_PATH = writeTempPolicy(
+    "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.5\n  execution:\n    autoRequires: [\"WARN\"]\nrules: []\n"
+  );
+  const { loadPolicyFromSource } = await import("../src/policy-code/loader");
+  const currentPolicy = loadPolicyFromSource({ source: "current" });
   replayStore = new InMemoryPolicyReplayStore();
   lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
   lineageStore = new InMemoryPolicyLineageStore();
+
+  const run = await replayStore.createRun({
+    requestedBy: "tester",
+    baselinePolicyHash: "base-hash",
+    candidatePolicyHash: currentPolicy.info.hash,
+    candidatePolicySource: "current",
+    candidatePolicyRef: null,
+    intentTypeFilter: null,
+    since: null,
+    until: null,
+    limit: 10
+  });
 
   const app = await buildApp();
   const response = await app.inject({
     method: "POST",
     url: "/v1/policy/promote",
     payload: {
-      runId: "run-1",
-      approvedBy: "Reviewer",
-      reason: "Regression clean"
+      runId: run.id,
+      approvedBy: "Reviewer"
     }
   });
 
   expect(response.statusCode).toBe(400);
   const payload = response.json();
-  expect(payload.message).toBe("Invalid promotion payload");
+  expect(payload.message).toBe("Promotion rationale is required.");
 
   await app.close();
 });

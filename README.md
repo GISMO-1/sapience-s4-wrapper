@@ -40,6 +40,16 @@ URLs/ports:
 5. View policy quality.
 6. View policy lineage.
 
+### Governance loop
+Use deterministic guardrails to check a candidate policy before promotion and record reviewer rationale:
+
+```bash
+curl -s "http://localhost:8080/v1/policy/promote/check?policyHash=POLICY_HASH" | jq
+curl -s -X POST http://localhost:8080/v1/policy/promote \\
+  -H 'content-type: application/json' \\
+  -d '{\"policyHash\":\"POLICY_HASH\",\"reviewer\":\"Reviewer\",\"rationale\":\"Guardrails satisfied.\",\"acceptedRisk\":12}' | jq
+```
+
 ### Demo seed script
 Purpose: seed sample intents, run a replay, record outcomes, and fetch quality/lineage data. Inputs: `API_BASE` (defaults to `http://localhost:8080`). Outputs: printed IDs and URLs.
 

@@ -17,6 +17,7 @@ export type PolicySnapshotStatus = {
   updatedAt: string;
   source?: PolicyCandidateSource;
   ref?: string | null;
+  inlineYaml?: string | null;
   approval?: PolicyApproval;
 };
 

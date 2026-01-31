@@ -260,10 +260,17 @@ export async function fetchPolicyImpactReport(payload: {
 export async function promotePolicy(payload: {
   runId: string;
   approvedBy: string;
-  rationale: string;
-  acceptedRiskScore: number;
+  rationale?: string;
+  acceptedRiskScore?: number;
   reason?: string;
   notes?: string;
+  force?: boolean;
+} | {
+  policyHash: string;
+  reviewer: string;
+  rationale?: string;
+  acceptedRisk?: number;
+  force?: boolean;
 }) {
   const response = await fetch(buildUrl("/v1/policy/promote"), {
     method: "POST",
@@ -278,6 +285,38 @@ export async function promotePolicy(payload: {
   }
 
   return response.json();
+}
+
+export type PromotionGuardrailReason = {
+  code: string;
+  message: string;
+  metric: number | string;
+  threshold: number | string;
+};
+
+export type PromotionGuardrailDecision = {
+  allowed: boolean;
+  requiredAcceptance: boolean;
+  reasons: PromotionGuardrailReason[];
+  snapshot: {
+    policyHash: string;
+    evaluatedAt: string;
+    drift: DriftReport;
+    impact: PolicyImpactSimulationReport & { impactedIntents: number };
+    quality: {
+      totalOutcomes: number;
+      failureRate: number;
+      overrideRate: number;
+      weightedPenalty: number;
+      qualityScore: number;
+      score: number;
+    };
+    lineageHead: PolicyLineageRecord | null;
+  };
+};
+
+export async function fetchPromotionCheck(policyHash: string): Promise<PromotionGuardrailDecision & { traceId: string }> {
+  return fetchJson(buildUrl(`/v1/policy/promote/check?policyHash=${encodeURIComponent(policyHash)}`));
 }
 
 export async function fetchPolicyStatus() {

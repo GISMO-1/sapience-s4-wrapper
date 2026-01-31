@@ -4,10 +4,10 @@ Purpose: Evaluate intents against YAML policy rules, compute risk, apply determi
 
 Example command:
 ```bash
-pnpm --filter api-gateway test -- --runInBand policy
+pnpm --filter api-gateway test -- -t "policy"
 ```
 
 Self-check:
 ```bash
-pnpm --filter api-gateway test -- --runInBand policy
+pnpm --filter api-gateway test -- -t "policy"
 ```

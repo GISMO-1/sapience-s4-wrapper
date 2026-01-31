@@ -4,8 +4,18 @@ import type { PolicySnapshotStatus, PolicyLifecycleRecord, PolicyApproval } from
 export type PolicyLifecycleStore = {
   getStatus: (hash: string) => PolicyLifecycleRecord | null;
   listStatuses: () => PolicyLifecycleRecord[];
-  registerDraft: (input: { hash: string; source?: PolicySnapshotStatus["source"]; ref?: string | null }) => PolicyLifecycleRecord;
-  markSimulated: (input: { hash: string; source?: PolicySnapshotStatus["source"]; ref?: string | null }) => PolicyLifecycleRecord;
+  registerDraft: (input: {
+    hash: string;
+    source?: PolicySnapshotStatus["source"];
+    ref?: string | null;
+    inlineYaml?: string | null;
+  }) => PolicyLifecycleRecord;
+  markSimulated: (input: {
+    hash: string;
+    source?: PolicySnapshotStatus["source"];
+    ref?: string | null;
+    inlineYaml?: string | null;
+  }) => PolicyLifecycleRecord;
   setActivePolicy: (input: { hash: string; version: string; path: string; loadedAt: string }) => PolicyLifecycleRecord;
   promotePolicy: (input: { hash: string; approval: PolicyApproval; source?: PolicySnapshotStatus["source"]; ref?: string | null }) => PolicyLifecycleRecord;
   getActivePolicy: () => PolicyLifecycleRecord | null;
@@ -25,7 +35,12 @@ export class InMemoryPolicyLifecycleStore implements PolicyLifecycleStore {
     return Array.from(this.records.values()).sort((a, b) => a.policyHash.localeCompare(b.policyHash));
   }
 
-  registerDraft(input: { hash: string; source?: PolicySnapshotStatus["source"]; ref?: string | null }): PolicyLifecycleRecord {
+  registerDraft(input: {
+    hash: string;
+    source?: PolicySnapshotStatus["source"];
+    ref?: string | null;
+    inlineYaml?: string | null;
+  }): PolicyLifecycleRecord {
     const existing = this.records.get(input.hash);
     if (existing) {
       return existing;
@@ -35,18 +50,25 @@ export class InMemoryPolicyLifecycleStore implements PolicyLifecycleStore {
       state: "draft",
       source: input.source,
       ref: input.ref ?? null,
+      inlineYaml: input.inlineYaml ?? null,
       updatedAt: this.now().toISOString()
     };
     this.records.set(input.hash, record);
     return record;
   }
 
-  markSimulated(input: { hash: string; source?: PolicySnapshotStatus["source"]; ref?: string | null }): PolicyLifecycleRecord {
+  markSimulated(input: {
+    hash: string;
+    source?: PolicySnapshotStatus["source"];
+    ref?: string | null;
+    inlineYaml?: string | null;
+  }): PolicyLifecycleRecord {
     const record: PolicyLifecycleRecord = {
       policyHash: input.hash,
       state: "simulated",
       source: input.source,
       ref: input.ref ?? null,
+      inlineYaml: input.inlineYaml ?? null,
       updatedAt: this.now().toISOString(),
       approval: this.records.get(input.hash)?.approval
     };
@@ -90,6 +112,7 @@ export class InMemoryPolicyLifecycleStore implements PolicyLifecycleStore {
       approval: input.approval,
       source: input.source,
       ref: input.ref ?? null,
+      inlineYaml: this.records.get(input.hash)?.inlineYaml ?? null,
       version: this.records.get(input.hash)?.version,
       path: this.records.get(input.hash)?.path,
       loadedAt: this.records.get(input.hash)?.loadedAt

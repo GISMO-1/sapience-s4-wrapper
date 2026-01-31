@@ -9,5 +9,5 @@ curl -s http://localhost:3000/v1/policy/lineage/current | jq
 
 Self-check:
 ```bash
-pnpm --filter api-gateway test -- --runInBand policy-lineage
+pnpm --filter api-gateway test -- -t "policy lineage"
 ```

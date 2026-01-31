@@ -43,6 +43,8 @@ import { installPolicyPack } from "./policy-packs/install";
 import { createPolicyRollbackStore } from "./policy-rollback/store";
 import { computeRollbackDecision } from "./policy-rollback/compute";
 import { buildReconcileReport, resolvePolicyDocumentByHash, resolvePolicyHashesForWindow } from "./policy-rollback/reconcile";
+import { buildDecisionRationale, buildDecisionRationaleMarkdown } from "./decision-rationale/build";
+import { createDecisionRationaleStore } from "./decision-rationale/store";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -59,6 +61,7 @@ const guardrailCheckStore = createPolicyGuardrailCheckStore();
 const policyApprovalStore = createPolicyApprovalStore();
 const policyPackRegistry = createPolicyPackRegistry();
 const rollbackStore = createPolicyRollbackStore();
+const decisionRationaleStore = createDecisionRationaleStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -240,6 +243,10 @@ const policyProvenanceQuerySchema = z.object({
   counterfactualUntil: z.string().datetime().optional(),
   counterfactualCompareToPolicyHash: z.string().min(1).optional(),
   counterfactualLimit: z.string().optional()
+});
+
+const decisionFormatQuerySchema = z.object({
+  format: z.enum(["md"]).optional()
 });
 
 const rollbackRequestSchema = z.object({
@@ -498,6 +505,22 @@ async function executeIntentAction(input: {
   }
 
   await notifyOrchestrationExecution(traceId, input.policyRecordId, input.policyHash);
+
+  const decisionRecord = await policyStore.getPolicyByTraceId(traceId);
+  if (decisionRecord) {
+    const approvals = await approvalStore.listApprovalsByTraceId(traceId);
+    const totalRules = policySnapshot.policy?.rules.length ?? policyDecision.matchedRules.length;
+    const rationale = buildDecisionRationale({
+      decisionType: "EXECUTION",
+      traceId,
+      policyHash: input.policyHash,
+      policyDecision,
+      decisionRecord,
+      approvals,
+      totalRules
+    });
+    await decisionRationaleStore.recordDecisionRationale(rationale);
+  }
 
   return {
     intent: plan.intent,
@@ -975,6 +998,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       approvalStore: policyApprovalStore,
       outcomeStore,
       rollbackStore,
+      decisionRationaleStore,
       policyInfo: activeSnapshot.info,
       counterfactual: counterfactualRequested
         ? {
@@ -993,6 +1017,58 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { traceId, report };
+  });
+
+  app.get("/v1/decision/:decisionId", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const decisionId = String((request.params as { decisionId: string }).decisionId);
+    const parsed = decisionFormatQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid decision request.", traceId };
+    }
+    const rationale = await decisionRationaleStore.getDecisionRationaleById(decisionId);
+    if (!rationale) {
+      reply.code(404);
+      return { message: "Decision rationale not found.", traceId };
+    }
+    if (parsed.data.format === "md") {
+      reply.type("text/markdown; charset=utf-8");
+      return buildDecisionRationaleMarkdown(rationale);
+    }
+    return { traceId, rationale };
+  });
+
+  app.get("/v1/trace/:traceId/decisions", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const targetTraceId = String((request.params as { traceId: string }).traceId);
+    const parsed = decisionFormatQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid decision request.", traceId };
+    }
+    const decisions = await decisionRationaleStore.listDecisionRationalesByTraceId(targetTraceId);
+    if (parsed.data.format === "md") {
+      reply.type("text/markdown; charset=utf-8");
+      return decisions.map((decision) => buildDecisionRationaleMarkdown(decision)).join("\n\n---\n\n");
+    }
+    return { traceId, decisions };
+  });
+
+  app.get("/v1/policy/:policyHash/decisions", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const policyHash = String((request.params as { policyHash: string }).policyHash);
+    const parsed = decisionFormatQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid decision request.", traceId };
+    }
+    const decisions = await decisionRationaleStore.listDecisionRationalesByPolicyHash(policyHash);
+    if (parsed.data.format === "md") {
+      reply.type("text/markdown; charset=utf-8");
+      return decisions.map((decision) => buildDecisionRationaleMarkdown(decision)).join("\n\n---\n\n");
+    }
+    return { traceId, decisions };
   });
 
   app.get("/v1/policy/packs", async (request, reply) => {
@@ -1179,6 +1255,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       lifecycleStore,
       lineageStore
     });
+    const counterfactualRationale = buildDecisionRationale({
+      decisionType: "COUNTERFACTUAL",
+      traceId,
+      policyHash: report.policyHash,
+      report
+    });
+    await decisionRationaleStore.recordDecisionRationale(counterfactualRationale);
     return { traceId, ...report };
   });
 
@@ -1200,6 +1283,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       lifecycleStore,
       lineageStore
     });
+    const counterfactualRationale = buildDecisionRationale({
+      decisionType: "COUNTERFACTUAL",
+      traceId,
+      policyHash: report.policyHash,
+      report
+    });
+    await decisionRationaleStore.recordDecisionRationale(counterfactualRationale);
     return { traceId, ...report };
   });
 
@@ -1292,14 +1382,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const activeSnapshot = policyEvaluator.getPolicySnapshot();
     const activePolicyHash = lifecycleStore.getActivePolicy()?.policyHash ?? activeSnapshot.info.hash;
 
-    const [lineage, activeLineageChain, simulations, guardrailChecks, approvals, rollbacks] = await Promise.all([
+    const [lineage, activeLineageChain, simulations, guardrailChecks, approvals, rollbacks, decisionRationales] =
+      await Promise.all([
       lineageStore.getLineage(policyHash),
       lineageStore.getLineageChain(activePolicyHash),
       replayStore.listRuns({ policyHash, limit: 200 }),
       guardrailCheckStore.listChecks(policyHash),
       policyApprovalStore.listApprovals(policyHash),
-      rollbackStore.listRollbacks({ policyHash })
-    ]);
+        rollbackStore.listRollbacks({ policyHash }),
+        decisionRationaleStore.listDecisionRationalesByPolicyHash(policyHash)
+      ]);
 
     return buildPolicyLifecycleTimeline({
       policyHash,
@@ -1309,7 +1401,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       simulations,
       guardrailChecks,
       approvals,
-      rollbacks
+      rollbacks,
+      decisionRationales
     });
   });
 
@@ -1351,6 +1444,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       rollbackStore,
       evaluator: policyEvaluator
     });
+
+    const rollbackRationale = buildDecisionRationale({
+      decisionType: "ROLLBACK",
+      traceId,
+      policyHash: decision.toPolicyHash,
+      decision,
+      event
+    });
+    await decisionRationaleStore.recordDecisionRationale(rollbackRationale);
 
     if (!decision.ok) {
       const notFound = decision.reasons.some((reason) => reason.includes("lineage store"));
@@ -1613,7 +1715,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       runId
     };
 
-    await policyApprovalStore.recordApproval({
+    const approvalRecord = await policyApprovalStore.recordApproval({
       policyHash,
       approvedBy: approval.approvedBy,
       approvedAt: approval.approvedAt,
@@ -1654,7 +1756,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
         rationale: rationale ?? "Guardrail check recorded during promotion.",
         decision
       });
-      await promotionStore.createPromotion({
+      const promotionRecord = await promotionStore.createPromotion({
         policyHash,
         evaluatedAt: decision.snapshot.evaluatedAt,
         reviewer,
@@ -1663,6 +1765,26 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
         forced: force,
         guardrailDecision: decision
       });
+
+      const counterfactualReport = await buildPolicyCounterfactualReport({
+        policyHash,
+        compareToPolicyHash: parentPolicyHash === policyHash ? undefined : parentPolicyHash,
+        outcomeStore,
+        replayStore,
+        lifecycleStore,
+        lineageStore
+      });
+
+      const promotionRationale = buildDecisionRationale({
+        decisionType: "PROMOTION",
+        traceId,
+        policyHash,
+        promotion: promotionRecord,
+        guardrailDecision: decision,
+        approval: approvalRecord,
+        counterfactual: counterfactualReport
+      });
+      await decisionRationaleStore.recordDecisionRationale(promotionRationale);
     }
 
     return {

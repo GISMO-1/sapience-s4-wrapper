@@ -4,6 +4,7 @@ import { PolicySandbox } from "./PolicySandbox";
 import { TraceViewer } from "./TraceViewer";
 import { PolicyProvenancePanel } from "./PolicyProvenancePanel";
 import { PolicyPacksPanel } from "./PolicyPacksPanel";
+import { DecisionRationalePanel } from "./DecisionRationalePanel";
 
 export function App() {
   const [input, setInput] = useState("");
@@ -50,6 +51,7 @@ export function App() {
       </section>
       <PolicySandbox />
       <TraceViewer />
+      <DecisionRationalePanel />
       <PolicyProvenancePanel />
       <PolicyPacksPanel />
     </div>

@@ -3,6 +3,7 @@ import type { PolicyApprovalRecord } from "../policy-approvals/types";
 import type { ReplayRunRecord } from "../policy-replay/types";
 import type { GuardrailCheckRecord } from "../policy-promotion-guardrails/types";
 import type { RollbackEvent } from "../policy-rollback/types";
+import type { DecisionRationale } from "../decision-rationale/types";
 
 export enum PolicyLifecycleState {
   DRAFT = "DRAFT",
@@ -20,6 +21,7 @@ export type PolicyLifecycleEvent = {
   timestamp: string;
   actor: string;
   rationale: string;
+  decisionId?: string;
 };
 
 export type PolicyLifecycleTimeline = {
@@ -96,8 +98,19 @@ export function buildPolicyLifecycleTimeline(input: {
   guardrailChecks: GuardrailCheckRecord[];
   approvals: PolicyApprovalRecord[];
   rollbacks?: RollbackEvent[];
+  decisionRationales?: DecisionRationale[];
 }): PolicyLifecycleTimeline {
   const events: PolicyLifecycleEvent[] = [];
+  const decisionRationales = input.decisionRationales ?? [];
+
+  function resolveDecisionId(decisionType: DecisionRationale["decisionType"], timestamp: string): string | undefined {
+    const normalized = normalizeTimestamp(timestamp);
+    const matches = decisionRationales
+      .filter((decision) => decision.decisionType === decisionType)
+      .filter((decision) => decision.timestamps.decidedAt === normalized)
+      .sort((a, b) => a.decisionId.localeCompare(b.decisionId));
+    return matches[0]?.decisionId;
+  }
 
   input.simulations.forEach((run) => {
     events.push({
@@ -127,20 +140,26 @@ export function buildPolicyLifecycleTimeline(input: {
   });
 
   if (input.lineage) {
+    const timestamp = normalizeTimestamp(input.lineage.promotedAt);
+    const decisionId = resolveDecisionId("PROMOTION", timestamp);
     events.push({
       type: "promotion",
-      timestamp: normalizeTimestamp(input.lineage.promotedAt),
+      timestamp,
       actor: input.lineage.promotedBy,
-      rationale: input.lineage.rationale
+      rationale: input.lineage.rationale,
+      ...(decisionId ? { decisionId } : {})
     });
   }
 
   input.rollbacks?.forEach((rollback) => {
+    const timestamp = normalizeTimestamp(rollback.createdAt);
+    const decisionId = resolveDecisionId("ROLLBACK", timestamp);
     events.push({
       type: "rollback",
-      timestamp: normalizeTimestamp(rollback.createdAt),
+      timestamp,
       actor: rollback.actor,
-      rationale: rollback.rationale
+      rationale: rollback.rationale,
+      ...(decisionId ? { decisionId } : {})
     });
   });
 

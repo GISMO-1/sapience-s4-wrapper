@@ -20,6 +20,8 @@ import type { PolicyLifecycleTimeline } from "../policy-lifecycle/timeline";
 import type { CounterfactualRequest } from "../policy-counterfactual/types";
 import { buildPolicyCounterfactualReport } from "../policy-counterfactual/compute";
 import type { PolicyProvenanceReport, PolicyImpactSimulationSummary, PolicyProvenanceMetadata } from "./types";
+import type { DecisionRationaleStore } from "../decision-rationale/store";
+import type { DecisionRationale } from "../decision-rationale/types";
 
 const RATE_DECIMALS = 4;
 
@@ -33,6 +35,7 @@ type BuildInput = {
   approvalStore: PolicyApprovalStore;
   outcomeStore: PolicyOutcomeStore;
   rollbackStore: PolicyRollbackStore;
+  decisionRationaleStore: DecisionRationaleStore;
   policyInfo?: PolicyInfo;
   counterfactual?: CounterfactualRequest;
 };
@@ -187,6 +190,20 @@ function normalizeRollbacks(rollbacks: RollbackEvent[]): RollbackEvent[] {
     });
 }
 
+function buildDecisionLedger(decisions: DecisionRationale[]): PolicyProvenanceReport["decisionLedger"] {
+  const ledger: PolicyProvenanceReport["decisionLedger"] = {};
+  const sorted = decisions.slice().sort((a, b) => {
+    if (a.timestamps.decidedAt !== b.timestamps.decidedAt) {
+      return a.timestamps.decidedAt.localeCompare(b.timestamps.decidedAt);
+    }
+    return a.decisionId.localeCompare(b.decisionId);
+  });
+  sorted.forEach((decision) => {
+    ledger[decision.decisionType] = decision.decisionId;
+  });
+  return ledger;
+}
+
 function parseTimestamp(value: string | null | undefined): number | null {
   if (!value) {
     return null;
@@ -259,8 +276,16 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
   const status = input.lifecycleStore.getStatus(input.policyHash);
   const activePolicyHash = input.activePolicyHash ?? input.lifecycleStore.getActivePolicy()?.policyHash ?? null;
 
-  const [lineage, activeLineageChain, simulations, guardrailChecksRaw, approvalsRaw, events, rollbacksRaw] =
-    await Promise.all([
+  const [
+    lineage,
+    activeLineageChain,
+    simulations,
+    guardrailChecksRaw,
+    approvalsRaw,
+    events,
+    rollbacksRaw,
+    decisionRationales
+  ] = await Promise.all([
     input.lineageStore.getLineage(input.policyHash),
     activePolicyHash ? input.lineageStore.getLineageChain(activePolicyHash) : Promise.resolve([]),
     input.replayStore.listRuns({ policyHash: input.policyHash, limit: 200 }),
@@ -277,7 +302,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
         lineageStore: input.lineageStore
       }
     }),
-    input.rollbackStore.listRollbacks({ policyHash: input.policyHash })
+    input.rollbackStore.listRollbacks({ policyHash: input.policyHash }),
+    input.decisionRationaleStore.listDecisionRationalesByPolicyHash(input.policyHash)
   ]);
 
   const timeline = normalizeTimeline(
@@ -289,13 +315,15 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
       simulations,
       guardrailChecks: guardrailChecksRaw,
       approvals: approvalsRaw,
-      rollbacks: rollbacksRaw
+      rollbacks: rollbacksRaw,
+      decisionRationales
     })
   );
 
   const guardrailChecks = normalizeGuardrailChecks(guardrailChecksRaw);
   const approvals = normalizeApprovals(approvalsRaw);
   const rollbacks = normalizeRollbacks(rollbacksRaw);
+  const decisionLedger = buildDecisionLedger(decisionRationales);
 
   const asOf = resolveAsOfTimestamp([
     status?.updatedAt,
@@ -305,7 +333,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
     ...guardrailChecks.map((check) => check.evaluatedAt),
     ...approvals.map((approval) => approval.approvedAt),
     ...events.map((event) => event.occurredAt),
-    ...rollbacks.map((rollback) => rollback.createdAt)
+    ...rollbacks.map((rollback) => rollback.createdAt),
+    ...decisionRationales.map((decision) => decision.timestamps.decidedAt)
   ]);
 
   const driftWindows = defaultDriftWindow(new Date(asOf));
@@ -364,6 +393,7 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
     approvals,
     driftReport,
     impactSimulationSummary: buildImpactSummary(guardrailChecks),
+    decisionLedger,
     determinism
   };
 
@@ -391,6 +421,9 @@ export function buildPolicyProvenanceMarkdown(report: PolicyProvenanceReport): s
   if (report.counterfactualReportHash) {
     lines.push(`- Counterfactual Report Hash: ${report.counterfactualReportHash}`);
   }
+  if (Object.keys(report.decisionLedger).length > 0) {
+    lines.push(`- Decision Ledger Entries: ${Object.keys(report.decisionLedger).length}`);
+  }
   lines.push("");
   lines.push("## Metadata");
   lines.push("");
@@ -408,8 +441,21 @@ export function buildPolicyProvenanceMarkdown(report: PolicyProvenanceReport): s
     lines.push("- No lifecycle events recorded.");
   } else {
     report.lifecycle.events.forEach((event) => {
-      lines.push(`- ${event.timestamp} · ${event.type} · ${event.actor}: ${event.rationale}`);
+      const decisionNote = event.decisionId ? ` · decision ${event.decisionId}` : "";
+      lines.push(`- ${event.timestamp} · ${event.type} · ${event.actor}: ${event.rationale}${decisionNote}`);
     });
+  }
+  lines.push("");
+  lines.push("## Decision Ledger");
+  lines.push("");
+  if (!Object.keys(report.decisionLedger).length) {
+    lines.push("- No decision ledger entries recorded.");
+  } else {
+    Object.entries(report.decisionLedger)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([decisionType, decisionId]) => {
+        lines.push(`- ${decisionType}: ${decisionId}`);
+      });
   }
   lines.push("");
   lines.push("## Rollbacks");

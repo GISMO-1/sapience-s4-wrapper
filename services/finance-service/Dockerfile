@@ -1,10 +1,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml* ./
+COPY services/finance-service/package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile=false
-COPY tsconfig.json ../../tsconfig.base.json ./
-COPY src ./src
+COPY services/finance-service/tsconfig.json tsconfig.base.json ./
+COPY services/finance-service/src ./src
 RUN pnpm run build
 RUN mkdir -p dist/db/migrations && cp -r src/db/migrations/*.sql dist/db/migrations/
 
@@ -13,5 +13,5 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json ./
+COPY services/finance-service/package.json ./
 CMD ["node", "dist/index.js"]

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   fetchReplayReport,
   fetchTraceExplain,
@@ -6,6 +6,7 @@ import {
   fetchPolicyQuality,
   fetchPolicyDrift,
   recordPolicyOutcome,
+  fetchPolicyImpactReport,
   fetchIntentDecision,
   approveIntent,
   executeIntent,
@@ -15,6 +16,7 @@ import {
   type PolicyQualityResponse,
   type PolicyDriftResponse,
   type PolicyLineageResponse,
+  type PolicyImpactSimulationReport,
   type IntentDecisionResponse,
   type ReplayCandidateSource,
   type ReplayReport
@@ -73,6 +75,16 @@ export function PolicySandbox() {
   const [policyDrift, setPolicyDrift] = useState<PolicyDriftResponse | null>(null);
   const [policyDriftError, setPolicyDriftError] = useState("");
   const [policyDriftLoading, setPolicyDriftLoading] = useState(false);
+  const [impactPolicyYaml, setImpactPolicyYaml] = useState(DEFAULT_INLINE);
+  const [impactSince, setImpactSince] = useState(() => {
+    const date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return date.toISOString().slice(0, 16);
+  });
+  const [impactUntil, setImpactUntil] = useState(() => new Date().toISOString().slice(0, 16));
+  const [impactLimit, setImpactLimit] = useState("100");
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState("");
+  const [impactReport, setImpactReport] = useState<PolicyImpactSimulationReport | null>(null);
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -192,6 +204,46 @@ export function PolicySandbox() {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImpactUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImpactPolicyYaml(String(reader.result ?? ""));
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImpactSimulation = async () => {
+    setImpactLoading(true);
+    setImpactError("");
+    setImpactReport(null);
+    try {
+      if (!impactPolicyYaml.trim()) {
+        throw new Error("Candidate policy YAML is required.");
+      }
+      const since = new Date(impactSince);
+      const until = new Date(impactUntil);
+      if (!Number.isFinite(since.getTime()) || !Number.isFinite(until.getTime())) {
+        throw new Error("Both since and until timestamps are required.");
+      }
+      const parsedLimit = Number(impactLimit);
+      const response = await fetchPolicyImpactReport({
+        candidatePolicy: impactPolicyYaml,
+        since: since.toISOString(),
+        until: until.toISOString(),
+        limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined
+      });
+      setImpactReport(response);
+    } catch (err) {
+      setImpactError((err as Error).message);
+    } finally {
+      setImpactLoading(false);
     }
   };
 
@@ -332,6 +384,19 @@ export function PolicySandbox() {
 
   const severityValue = Number(outcomeSeverity);
   const severityValid = Number.isFinite(severityValue) && severityValue >= 1 && severityValue <= 5;
+  const impactedRows =
+    impactReport?.rows.filter((row) => !(row.classifications.length === 1 && row.classifications[0] === "UNCHANGED")) ??
+    [];
+
+  const blastRadiusClass = (score: number) => {
+    if (score >= 70) {
+      return "impact-badge impact-badge-high";
+    }
+    if (score >= 30) {
+      return "impact-badge impact-badge-medium";
+    }
+    return "impact-badge impact-badge-low";
+  };
 
   return (
     <section className="policy-sandbox">
@@ -416,6 +481,128 @@ export function PolicySandbox() {
           </button>
           {error && <span className="sandbox-error">{error}</span>}
         </div>
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy Impact Simulation</h3>
+        <p>Compare a candidate policy to the active policy over historical intents.</p>
+        <div className="sandbox-section">
+          <label className="sandbox-notes">
+            Candidate policy (paste or upload)
+            <textarea
+              value={impactPolicyYaml}
+              onChange={(event) => setImpactPolicyYaml(event.target.value)}
+              rows={6}
+              placeholder="Paste candidate policy YAML"
+            />
+          </label>
+          <div className="sandbox-row">
+            <label>
+              Upload policy file
+              <input type="file" accept=".yaml,.yml,.txt" onChange={handleImpactUpload} />
+            </label>
+          </div>
+        </div>
+        <div className="sandbox-row">
+          <label>
+            Since
+            <input
+              type="datetime-local"
+              value={impactSince}
+              onChange={(event) => setImpactSince(event.target.value)}
+            />
+          </label>
+          <label>
+            Until
+            <input
+              type="datetime-local"
+              value={impactUntil}
+              onChange={(event) => setImpactUntil(event.target.value)}
+            />
+          </label>
+          <label>
+            Limit
+            <input
+              type="number"
+              min={1}
+              value={impactLimit}
+              onChange={(event) => setImpactLimit(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="sandbox-actions">
+          <button type="button" onClick={handleImpactSimulation} disabled={impactLoading}>
+            {impactLoading ? "Simulating..." : "Run simulation"}
+          </button>
+          {impactError && <span className="sandbox-error">{impactError}</span>}
+        </div>
+        {impactReport && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Blast radius</strong>
+                <div className={blastRadiusClass(impactReport.blastRadiusScore)}>
+                  {impactReport.blastRadiusScore}
+                </div>
+              </div>
+              <div>
+                <strong>Intents evaluated</strong>
+                <div>{impactReport.totals.intentsEvaluated}</div>
+              </div>
+              <div>
+                <strong>Newly blocked</strong>
+                <div>{impactReport.totals.newlyBlocked}</div>
+              </div>
+              <div>
+                <strong>Approval escalations</strong>
+                <div>{impactReport.totals.approvalEscalations}</div>
+              </div>
+              <div>
+                <strong>Severity increases</strong>
+                <div>{impactReport.totals.severityIncreases}</div>
+              </div>
+              <div>
+                <strong>Newly allowed</strong>
+                <div>{impactReport.totals.newlyAllowed}</div>
+              </div>
+            </div>
+            <h4>Impacted intents</h4>
+            {impactedRows.length === 0 ? (
+              <div>No impacted intents in this window.</div>
+            ) : (
+              <table className="sandbox-table">
+                <thead>
+                  <tr>
+                    <th>Trace</th>
+                    <th>Intent</th>
+                    <th>Prev</th>
+                    <th>Next</th>
+                    <th>Approvals</th>
+                    <th>Severity</th>
+                    <th>Classifications</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {impactedRows.map((row) => (
+                    <tr key={`${row.traceId}-${row.intentId}`}>
+                      <td>{row.traceId}</td>
+                      <td>{row.intentType}</td>
+                      <td>{row.prevDecision}</td>
+                      <td>{row.nextDecision}</td>
+                      <td>
+                        {row.prevApprovalsRequired.join(", ") || "none"} → {row.nextApprovalsRequired.join(", ") || "none"}
+                      </td>
+                      <td>
+                        {row.prevSeverity} → {row.nextSeverity}
+                      </td>
+                      <td>{row.classifications.join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="sandbox-card">

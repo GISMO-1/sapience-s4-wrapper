@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
-import type { ReplayReport, PolicyDriftResponse } from "./api";
+import type { ReplayReport, PolicyDriftResponse, PolicyImpactSimulationReport } from "./api";
 
 vi.mock("./api", () => ({
   runPolicyReplay: vi.fn(),
@@ -13,6 +13,7 @@ vi.mock("./api", () => ({
   fetchPolicyQuality: vi.fn(),
   fetchPolicyDrift: vi.fn(),
   recordPolicyOutcome: vi.fn(),
+  fetchPolicyImpactReport: vi.fn(),
   fetchIntentDecision: vi.fn(),
   approveIntent: vi.fn(),
   executeIntent: vi.fn()
@@ -122,6 +123,35 @@ const baseDrift: PolicyDriftResponse = {
       rationale: ["failureRateDelta >= 0.05 (0.0500)"]
     }
   }
+};
+
+const baseImpactReport: PolicyImpactSimulationReport = {
+  traceId: "trace-1",
+  policyHashCurrent: "policy-current",
+  policyHashCandidate: "policy-candidate",
+  window: { since: "2024-02-01T00:00:00Z", until: "2024-02-02T00:00:00Z" },
+  totals: {
+    intentsEvaluated: 2,
+    newlyBlocked: 1,
+    newlyAllowed: 0,
+    approvalEscalations: 1,
+    severityIncreases: 1
+  },
+  blastRadiusScore: 10,
+  rows: [
+    {
+      intentId: "trace-1",
+      traceId: "trace-1",
+      intentType: "CREATE_PO",
+      prevDecision: "WARN",
+      nextDecision: "DENY",
+      prevApprovalsRequired: ["FINANCE_REVIEWER"],
+      nextApprovalsRequired: ["FINANCE_REVIEWER", "COMPLIANCE_REVIEWER"],
+      prevSeverity: 1,
+      nextSeverity: 2,
+      classifications: ["NEWLY_BLOCKED", "APPROVAL_ESCALATED", "SEVERITY_INCREASED"]
+    }
+  ]
 };
 
 test("promotion button remains disabled when impact guardrails block promotion", async () => {
@@ -260,6 +290,45 @@ test("policy health section renders and calls drift endpoint", async () => {
   await waitFor(() => {
     expect(fetchPolicyDrift).toHaveBeenCalledWith("policy-1");
   });
+});
+
+test("policy impact simulation renders blast radius summary", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, fetchPolicyImpactReport } =
+    await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyImpactReport).mockResolvedValue(baseImpactReport);
+
+  render(<PolicySandbox />);
+
+  fireEvent.change(screen.getByLabelText(/Candidate policy/i), {
+    target: { value: "version: \"v1\"\n" }
+  });
+  fireEvent.change(screen.getByLabelText(/Since/i), {
+    target: { value: "2024-02-01T00:00" }
+  });
+  fireEvent.change(screen.getByLabelText(/Until/i), {
+    target: { value: "2024-02-02T00:00" }
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /Run simulation/i }));
+
+  await waitFor(() => {
+    expect(fetchPolicyImpactReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidatePolicy: "version: \"v1\"\n"
+      })
+    );
+  });
+
+  expect(await screen.findByText(/Blast radius/i)).toBeInTheDocument();
+  expect(screen.getByText("10")).toBeInTheDocument();
+  expect(screen.getByText(/NEWLY_BLOCKED/)).toBeInTheDocument();
 });
 
 test("execution gate fetches decision and shows missing approvals", async () => {

@@ -140,6 +140,36 @@ export type PolicyImpactReport = {
   blocked: boolean;
 };
 
+export type PolicyImpactSimulationReport = {
+  traceId: string;
+  policyHashCurrent: string;
+  policyHashCandidate: string;
+  window: {
+    since: string;
+    until: string;
+  };
+  totals: {
+    intentsEvaluated: number;
+    newlyBlocked: number;
+    newlyAllowed: number;
+    approvalEscalations: number;
+    severityIncreases: number;
+  };
+  blastRadiusScore: number;
+  rows: Array<{
+    intentId: string;
+    traceId: string;
+    intentType: string;
+    prevDecision: "ALLOW" | "WARN" | "DENY";
+    nextDecision: "ALLOW" | "WARN" | "DENY";
+    prevApprovalsRequired: string[];
+    nextApprovalsRequired: string[];
+    prevSeverity: number;
+    nextSeverity: number;
+    classifications: string[];
+  }>;
+};
+
 export type ReplayReport = {
   traceId: string;
   run: {
@@ -212,6 +242,19 @@ export async function runPolicyReplay(payload: {
 
 export async function fetchReplayReport(runId: string): Promise<ReplayReport> {
   return fetchJson(buildUrl(`/v1/policy/replay/${encodeURIComponent(runId)}/report`));
+}
+
+export async function fetchPolicyImpactReport(payload: {
+  candidatePolicy: string | { source: ReplayCandidateSource; ref?: string; yaml?: string };
+  since: string;
+  until: string;
+  limit?: number;
+}): Promise<PolicyImpactSimulationReport> {
+  return fetchJson(buildUrl("/v1/policy/impact"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function promotePolicy(payload: {

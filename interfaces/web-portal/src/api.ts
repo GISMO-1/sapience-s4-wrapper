@@ -170,6 +170,51 @@ export type PolicyImpactSimulationReport = {
   }>;
 };
 
+export type TrustReport = {
+  policyHash: string;
+  generatedAt: string;
+  healthState: "HEALTHY" | "WATCH" | "DEGRADED" | "CRITICAL";
+  lastDecisionSummary: {
+    decisionType: "EXECUTION" | "PROMOTION" | "ROLLBACK" | "COUNTERFACTUAL";
+    outcome: "ALLOW" | "DENY" | "WARN" | "FAIL";
+    confidenceScore: number;
+    acceptedRisk: {
+      severity: "LOW" | "MEDIUM" | "HIGH";
+      justification: string;
+      reviewer?: string | null;
+      score?: number | null;
+    };
+  };
+  driftSummary: {
+    window: { since: string; until: string };
+    deltaCounts: {
+      failureRateDelta: number;
+      overrideRateDelta: number;
+      qualityScoreDelta: number;
+      replayDelta: number;
+    };
+    severity: "HEALTHY" | "WATCH" | "DEGRADED" | "CRITICAL";
+  };
+  determinismStatus: {
+    reproducible: boolean;
+    lastVerifiedAt: string;
+  };
+  rollbackStatus: {
+    lastRollbackAt: string | null;
+    reconciled: boolean;
+  };
+  counterfactualSummary: {
+    alternativesEvaluated: number;
+    maxDeltaSeverity: number;
+  };
+  provenanceHash: string;
+  overallTrustScore: number;
+};
+
+export async function fetchTrustReport(): Promise<{ report: TrustReport }> {
+  return fetchJson(buildUrl("/v1/system/trust"));
+}
+
 export type CounterfactualRequest = {
   policyHash: string;
   compareToPolicyHash?: string;

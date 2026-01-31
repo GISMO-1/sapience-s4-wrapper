@@ -5,6 +5,7 @@ import { TraceViewer } from "./TraceViewer";
 import { PolicyProvenancePanel } from "./PolicyProvenancePanel";
 import { PolicyPacksPanel } from "./PolicyPacksPanel";
 import { DecisionRationalePanel } from "./DecisionRationalePanel";
+import { TrustPanel } from "./TrustPanel";
 
 export function App() {
   const [input, setInput] = useState("");
@@ -34,6 +35,7 @@ export function App() {
         <h1>Sapience Portal</h1>
         <p>Send a simple intent to the API gateway.</p>
       </header>
+      <TrustPanel />
       <form onSubmit={handleSubmit} className="chat-form">
         <textarea
           value={input}

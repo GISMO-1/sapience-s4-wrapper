@@ -1,0 +1,46 @@
+{
+  "report": {
+    "policyHash": "policy-123",
+    "generatedAt": "2024-04-10T12:00:00.000Z",
+    "healthState": "DEGRADED",
+    "lastDecisionSummary": {
+      "decisionType": "EXECUTION",
+      "outcome": "ALLOW",
+      "confidenceScore": 0.82,
+      "acceptedRisk": {
+        "severity": "LOW",
+        "justification": "Within baseline guardrails.",
+        "reviewer": null,
+        "score": 0.1
+      }
+    },
+    "driftSummary": {
+      "window": {
+        "since": "2024-04-03T12:00:00.000Z",
+        "until": "2024-04-10T12:00:00.000Z"
+      },
+      "deltaCounts": {
+        "failureRateDelta": 0,
+        "overrideRateDelta": -0.5,
+        "qualityScoreDelta": -20,
+        "replayDelta": 3
+      },
+      "severity": "DEGRADED"
+    },
+    "determinismStatus": {
+      "reproducible": false,
+      "lastVerifiedAt": "2024-04-10T12:00:00.000Z"
+    },
+    "rollbackStatus": {
+      "lastRollbackAt": "2024-04-09T10:00:00.000Z",
+      "reconciled": true
+    },
+    "counterfactualSummary": {
+      "alternativesEvaluated": 0,
+      "maxDeltaSeverity": 0
+    },
+    "provenanceHash": "9b75e804055660abf08ebc4f3702eac6342a889ceeb869b9afb234eed9aa81f0",
+    "overallTrustScore": 53.47
+  },
+  "trustReportHash": "43e1dcd7fc5df21ec7ebbdf3c8d8b605fe16aa27f1005d56630ccea2973d851a"
+}

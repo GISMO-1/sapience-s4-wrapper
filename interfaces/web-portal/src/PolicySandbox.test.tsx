@@ -8,7 +8,8 @@ vi.mock("./api", () => ({
   runPolicyReplay: vi.fn(),
   fetchReplayReport: vi.fn(),
   fetchTraceExplain: vi.fn(),
-  promotePolicy: vi.fn()
+  promotePolicy: vi.fn(),
+  fetchPolicyLineageCurrent: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -66,11 +67,16 @@ const baseReport: ReplayReport = {
 };
 
 test("promotion button remains disabled when impact guardrails block promotion", async () => {
-  const { runPolicyReplay, fetchReplayReport } = await import("./api");
+  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent } = await import("./api");
   vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
   vi.mocked(fetchReplayReport).mockResolvedValue({
     ...baseReport,
     impact: { ...baseReport.impact, blocked: true }
+  });
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
   });
 
   render(<PolicySandbox />);
@@ -78,22 +84,60 @@ test("promotion button remains disabled when impact guardrails block promotion",
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: "Regression clean" } });
+  fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
+  fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   expect(screen.getByRole("button", { name: /promote policy/i })).toBeDisabled();
 });
 
 test("promotion button enables after approval details when impact is within thresholds", async () => {
-  const { runPolicyReplay, fetchReplayReport } = await import("./api");
+  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent } = await import("./api");
   vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
   vi.mocked(fetchReplayReport).mockResolvedValue(baseReport);
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
 
   render(<PolicySandbox />);
   fireEvent.click(screen.getByRole("button", { name: /run replay/i }));
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: "Regression clean" } });
+  fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
+  fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   expect(screen.getByRole("button", { name: /promote policy/i })).toBeEnabled();
+});
+
+test("policy lineage renders without crashing", async () => {
+  const { fetchPolicyLineageCurrent } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: [
+      {
+        policyHash: "policy-1",
+        parentPolicyHash: "policy-0",
+        promotedBy: "Reviewer",
+        promotedAt: "2024-02-01T10:00:00Z",
+        rationale: "Regression results match baseline.",
+        acceptedRiskScore: 12,
+        source: "replay",
+        drift: {
+          constraintsAdded: 2,
+          constraintsRemoved: 1,
+          severityDelta: 1,
+          netRiskScoreChange: 1
+        }
+      }
+    ]
+  });
+
+  render(<PolicySandbox />);
+
+  expect(await screen.findByText(/Current policy lineage/i)).toBeInTheDocument();
+  const hashes = await screen.findAllByText(/policy-1/);
+  expect(hashes.length).toBeGreaterThan(0);
 });

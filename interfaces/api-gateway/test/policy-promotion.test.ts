@@ -7,10 +7,13 @@ import type { PolicyReplayStore } from "../src/policy-replay/replay-store";
 import { InMemoryPolicyReplayStore } from "../src/policy-replay/replay-store";
 import type { PolicyLifecycleStore } from "../src/policy-lifecycle/store";
 import { InMemoryPolicyLifecycleStore } from "../src/policy-lifecycle/store";
+import type { PolicyLineageStore } from "../src/policy-lineage/store";
+import { InMemoryPolicyLineageStore } from "../src/policy-lineage/store";
 import type { ReplayResultRecord } from "../src/policy-replay/types";
 
 let replayStore: PolicyReplayStore;
 let lifecycleStore: PolicyLifecycleStore;
+let lineageStore: PolicyLineageStore;
 
 vi.mock("../src/policy-replay/replay-store", async () => {
   const actual = await vi.importActual<typeof import("../src/policy-replay/replay-store")>(
@@ -29,6 +32,16 @@ vi.mock("../src/policy-lifecycle/store", async () => {
   return {
     ...actual,
     createPolicyLifecycleStore: () => lifecycleStore
+  };
+});
+
+vi.mock("../src/policy-lineage/store", async () => {
+  const actual = await vi.importActual<typeof import("../src/policy-lineage/store")>(
+    "../src/policy-lineage/store"
+  );
+  return {
+    ...actual,
+    createPolicyLineageStore: () => lineageStore
   };
 });
 
@@ -61,6 +74,7 @@ function buildResult(id: string, overrides?: Partial<ReplayResultRecord>): Repla
     baselineMatchedRules: overrides?.baselineMatchedRules ?? [],
     candidateMatchedRules: overrides?.candidateMatchedRules ?? [],
     candidateConstraintTypes: overrides?.candidateConstraintTypes ?? [],
+    baselineRisk: overrides?.baselineRisk ?? { level: "low", signals: [] },
     reasons: overrides?.reasons ?? [],
     categories: overrides?.categories ?? [],
     risk: overrides?.risk ?? { level: "low", signals: [] },
@@ -80,6 +94,7 @@ test("policy promotion succeeds when guardrails are within limits", async () => 
   );
   replayStore = new InMemoryPolicyReplayStore();
   lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
+  lineageStore = new InMemoryPolicyLineageStore();
 
   const run = await replayStore.createRun({
     requestedBy: "tester",
@@ -102,6 +117,8 @@ test("policy promotion succeeds when guardrails are within limits", async () => 
     payload: {
       runId: run.id,
       approvedBy: "Reviewer",
+      rationale: "Regression results match baseline expectations.",
+      acceptedRiskScore: 12,
       reason: "Regression clean",
       notes: "Low blast radius."
     }
@@ -122,6 +139,7 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
   );
   replayStore = new InMemoryPolicyReplayStore();
   lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
+  lineageStore = new InMemoryPolicyLineageStore();
 
   const run = await replayStore.createRun({
     requestedBy: "tester",
@@ -147,6 +165,8 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
     payload: {
       runId: run.id,
       approvedBy: "Reviewer",
+      rationale: "Regression results match baseline expectations.",
+      acceptedRiskScore: 12,
       reason: "Regression clean"
     }
   });
@@ -154,6 +174,29 @@ test("policy promotion is blocked when impact thresholds are exceeded", async ()
   expect(response.statusCode).toBe(409);
   const payload = response.json();
   expect(payload.message).toBe("Promotion blocked by impact guardrails.");
+
+  await app.close();
+});
+
+test("policy promotion rejects payloads without rationale or accepted risk", async () => {
+  replayStore = new InMemoryPolicyReplayStore();
+  lifecycleStore = new InMemoryPolicyLifecycleStore(() => new Date("2024-02-01T00:00:00Z"));
+  lineageStore = new InMemoryPolicyLineageStore();
+
+  const app = await buildApp();
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/policy/promote",
+    payload: {
+      runId: "run-1",
+      approvedBy: "Reviewer",
+      reason: "Regression clean"
+    }
+  });
+
+  expect(response.statusCode).toBe(400);
+  const payload = response.json();
+  expect(payload.message).toBe("Invalid promotion payload");
 
   await app.close();
 });

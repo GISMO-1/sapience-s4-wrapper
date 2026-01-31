@@ -146,6 +146,7 @@ export function createPolicyReplayEngine(store: PolicyReplayStore) {
         baselineMatchedRules: intent.baselineMatchedRules,
         candidateMatchedRules: evaluation.matchedRuleIds,
         candidateConstraintTypes: evaluation.constraintTypes,
+        baselineRisk: intent.baselineRisk,
         reasons: evaluation.reasons,
         categories: evaluation.categories,
         risk: evaluation.risk,

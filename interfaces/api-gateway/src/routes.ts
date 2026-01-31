@@ -18,6 +18,8 @@ import { createPolicyReplayEngine } from "./policy-replay/replay-engine";
 import { buildReport } from "./policy-replay/report";
 import { calculatePolicyImpact } from "./policy-lifecycle/impact";
 import { createPolicyLifecycleStore } from "./policy-lifecycle/store";
+import { buildPolicyDriftSummary } from "./policy-lineage/drift";
+import { createPolicyLineageStore } from "./policy-lineage/store";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -25,6 +27,7 @@ const policyEvaluator = createPolicyEvaluator();
 const replayStore = createPolicyReplayStore();
 const replayEngine = createPolicyReplayEngine(replayStore);
 const lifecycleStore = createPolicyLifecycleStore();
+const lineageStore = createPolicyLineageStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -79,7 +82,9 @@ const replayRunQuerySchema = z.object({
 const promoteRequestSchema = z.object({
   runId: z.string().min(1),
   approvedBy: z.string().min(1),
-  reason: z.string().min(1),
+  reason: z.string().min(1).optional(),
+  rationale: z.string().min(10),
+  acceptedRiskScore: z.number(),
   notes: z.string().optional()
 });
 
@@ -392,9 +397,37 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.get("/v1/policy/lineage/current", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const active = lifecycleStore.getActivePolicy() ?? policyEvaluator.getPolicySnapshot();
+    const policyHash = "policyHash" in active ? active.policyHash : active.info.hash;
+    const lineage = await lineageStore.getLineageChain(policyHash);
+    if (!lineage.length) {
+      reply.code(404);
+      return { message: "Lineage not found", traceId };
+    }
+    return { traceId, policyHash, lineage };
+  });
+
+  app.get("/v1/policy/lineage/:policyHash", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const policyHash = String((request.params as { policyHash: string }).policyHash);
+    const lineage = await lineageStore.getLineageChain(policyHash);
+    if (!lineage.length) {
+      reply.code(404);
+      return { message: "Lineage not found", traceId };
+    }
+    return { traceId, policyHash, lineage };
+  });
+
   app.post("/v1/policy/promote", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
-    const body = promoteRequestSchema.parse(request.body ?? {});
+    const parsed = promoteRequestSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid promotion payload", traceId };
+    }
+    const body = parsed.data;
     const run = await replayStore.getRun(body.runId);
     if (!run) {
       reply.code(404);
@@ -410,10 +443,25 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const approval = {
       approvedBy: body.approvedBy,
       approvedAt: new Date().toISOString(),
-      reason: body.reason,
+      reason: body.reason ?? body.rationale,
+      rationale: body.rationale,
+      acceptedRiskScore: body.acceptedRiskScore,
       notes: body.notes,
       runId: run.id
     };
+
+    const parentPolicyHash = policyEvaluator.getPolicySnapshot().info.hash;
+    const drift = buildPolicyDriftSummary(results);
+    await lineageStore.createLineage({
+      policyHash: run.candidatePolicyHash,
+      parentPolicyHash: parentPolicyHash === run.candidatePolicyHash ? null : parentPolicyHash,
+      promotedBy: approval.approvedBy,
+      promotedAt: approval.approvedAt,
+      rationale: body.rationale,
+      acceptedRiskScore: body.acceptedRiskScore,
+      source: "replay",
+      drift
+    });
 
     const promoted = lifecycleStore.promotePolicy({
       hash: run.candidatePolicyHash,

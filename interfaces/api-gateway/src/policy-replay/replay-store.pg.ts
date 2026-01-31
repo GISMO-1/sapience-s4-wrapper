@@ -57,10 +57,11 @@ export class PostgresPolicyReplayStore {
               i.created_at,
               p.decision,
               p.matched_rule_ids,
-              p.policy_hash
+              p.policy_hash,
+              p.risk
        FROM intents i
        JOIN LATERAL (
-         SELECT decision, matched_rule_ids, policy_hash
+         SELECT decision, matched_rule_ids, policy_hash, risk
          FROM policy_decisions pd
          WHERE pd.trace_id = i.trace_id
          ORDER BY pd.created_at DESC
@@ -79,7 +80,8 @@ export class PostgresPolicyReplayStore {
       createdAt: row.created_at,
       baselineDecision: row.decision,
       baselineMatchedRules: row.matched_rule_ids,
-      baselinePolicyHash: row.policy_hash
+      baselinePolicyHash: row.policy_hash,
+      baselineRisk: row.risk
     }));
   }
 
@@ -128,9 +130,9 @@ export class PostgresPolicyReplayStore {
     const rows: string[] = [];
 
     results.forEach((result, index) => {
-      const base = index * 15;
+      const base = index * 16;
       rows.push(
-        `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9},$${base + 10},$${base + 11},$${base + 12},$${base + 13},$${base + 14},$${base + 15})`
+        `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9},$${base + 10},$${base + 11},$${base + 12},$${base + 13},$${base + 14},$${base + 15},$${base + 16})`
       );
       values.push(
         result.id,
@@ -145,6 +147,7 @@ export class PostgresPolicyReplayStore {
         result.baselineMatchedRules,
         result.candidateMatchedRules,
         result.candidateConstraintTypes,
+        JSON.stringify(result.baselineRisk),
         JSON.stringify(result.reasons),
         result.categories,
         JSON.stringify(result.risk)
@@ -153,7 +156,7 @@ export class PostgresPolicyReplayStore {
 
     await pool.query(
       `INSERT INTO policy_replay_results
-       (id, run_id, trace_id, intent_type, baseline_decision, candidate_decision, changed, baseline_policy_hash, candidate_policy_hash, baseline_matched_rules, candidate_matched_rules, candidate_constraint_types, reasons, categories, risk)
+       (id, run_id, trace_id, intent_type, baseline_decision, candidate_decision, changed, baseline_policy_hash, candidate_policy_hash, baseline_matched_rules, candidate_matched_rules, candidate_constraint_types, baseline_risk, reasons, categories, risk)
        VALUES ${rows.join(",")}`,
       values
     );
@@ -198,7 +201,7 @@ export class PostgresPolicyReplayStore {
     values.push(offset);
 
     const result = await pool.query(
-      `SELECT id, run_id, trace_id, intent_type, baseline_decision, candidate_decision, changed, baseline_policy_hash, candidate_policy_hash, baseline_matched_rules, candidate_matched_rules, candidate_constraint_types, reasons, categories, risk, created_at
+      `SELECT id, run_id, trace_id, intent_type, baseline_decision, candidate_decision, changed, baseline_policy_hash, candidate_policy_hash, baseline_matched_rules, candidate_matched_rules, candidate_constraint_types, baseline_risk, reasons, categories, risk, created_at
        FROM policy_replay_results
        WHERE ${where.join(" AND ")}
        ORDER BY created_at ASC, trace_id ASC
@@ -219,6 +222,7 @@ export class PostgresPolicyReplayStore {
       baselineMatchedRules: row.baseline_matched_rules,
       candidateMatchedRules: row.candidate_matched_rules,
       candidateConstraintTypes: row.candidate_constraint_types ?? [],
+      baselineRisk: row.baseline_risk,
       reasons: row.reasons,
       categories: row.categories,
       risk: row.risk,

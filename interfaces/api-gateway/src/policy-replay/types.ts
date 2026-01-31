@@ -25,6 +25,7 @@ export type ReplayBaselineIntent = {
   baselineDecision: PolicyDecision;
   baselineMatchedRules: string[];
   baselinePolicyHash: string;
+  baselineRisk: RiskAssessment;
 };
 
 export type ReplayRunInput = {
@@ -66,6 +67,7 @@ export type ReplayResultRecord = {
   baselineMatchedRules: string[];
   candidateMatchedRules: string[];
   candidateConstraintTypes: string[];
+  baselineRisk: RiskAssessment;
   reasons: PolicyReason[];
   categories: string[];
   risk: RiskAssessment;

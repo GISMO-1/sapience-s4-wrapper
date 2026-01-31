@@ -5,6 +5,8 @@ export type PolicyApproval = {
   approvedBy: string;
   approvedAt: string;
   reason: string;
+  rationale?: string;
+  acceptedRiskScore?: number;
   notes?: string;
   runId: string;
 };

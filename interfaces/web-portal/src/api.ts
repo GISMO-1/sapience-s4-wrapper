@@ -129,7 +129,9 @@ export async function fetchReplayReport(runId: string): Promise<ReplayReport> {
 export async function promotePolicy(payload: {
   runId: string;
   approvedBy: string;
-  reason: string;
+  rationale: string;
+  acceptedRiskScore: number;
+  reason?: string;
   notes?: string;
 }) {
   const response = await fetch(buildUrl("/v1/policy/promote"), {
@@ -154,5 +156,45 @@ export async function fetchPolicyStatus() {
     throw new Error("Policy status request failed");
   }
 
+  return response.json();
+}
+
+export type PolicyDriftSummary = {
+  constraintsAdded: number;
+  constraintsRemoved: number;
+  severityDelta: number;
+  netRiskScoreChange: number;
+};
+
+export type PolicyLineageRecord = {
+  policyHash: string;
+  parentPolicyHash: string | null;
+  promotedBy: string;
+  promotedAt: string;
+  rationale: string;
+  acceptedRiskScore: number;
+  source: "replay" | "manual";
+  drift: PolicyDriftSummary;
+};
+
+export type PolicyLineageResponse = {
+  traceId: string;
+  policyHash: string;
+  lineage: PolicyLineageRecord[];
+};
+
+export async function fetchPolicyLineageCurrent(): Promise<PolicyLineageResponse> {
+  const response = await fetch(buildUrl("/v1/policy/lineage/current"));
+  if (!response.ok) {
+    throw new Error("Policy lineage request failed");
+  }
+  return response.json();
+}
+
+export async function fetchPolicyLineageByHash(policyHash: string): Promise<PolicyLineageResponse> {
+  const response = await fetch(buildUrl(`/v1/policy/lineage/${encodeURIComponent(policyHash)}`));
+  if (!response.ok) {
+    throw new Error("Policy lineage request failed");
+  }
   return response.json();
 }

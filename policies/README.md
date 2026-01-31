@@ -166,6 +166,20 @@ curl -s "http://localhost:3000/v1/policy/quality?policyHash=POLICY_HASH" | jq
 
 Quality score notes (window-scoped): failures are weighted 3× severity, rollbacks 2×, overrides 1×, and successes 0×. The weighted penalty is normalized against the maximum possible penalty (severity 5, weight 3) to produce a 0–100 score.
 
+## Drift health signals
+
+The gateway exposes deterministic drift health signals that compare a recent 7-day window to a 30-day baseline. The drift report aggregates outcome quality, replay diff counts, and (if present) lineage drift summaries.
+
+Health thresholds:
+- **WATCH**: failure rate delta ≥ 0.05, override rate delta ≥ 0.05, or replay delta ≥ 10.
+- **DEGRADED**: quality score < 80, failure rate > 0.10, override rate > 0.10, or replay delta ≥ 25.
+- **CRITICAL**: quality score < 60, failure rate > 0.20, override rate > 0.20, or replay delta ≥ 50.
+
+Example: fetch drift health for a policy hash:
+```bash
+curl -s "http://localhost:3000/v1/policy/drift?policyHash=POLICY_HASH" | jq
+```
+
 ## Safe fallback
 
 If policy loading fails and no cached policy exists, the gateway uses a safe fallback:

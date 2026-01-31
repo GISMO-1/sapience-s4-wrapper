@@ -5,6 +5,7 @@ import type {
   ReplayBaselineIntent,
   ReplayFilters,
   ReplayResultRecord,
+  ReplayRunFilters,
   ReplayRunInput,
   ReplayRunRecord,
   ReplayTotals
@@ -82,6 +83,50 @@ export class PostgresPolicyReplayStore {
       baselineMatchedRules: row.matched_rule_ids,
       baselinePolicyHash: row.policy_hash,
       baselineRisk: row.risk
+    }));
+  }
+
+  async listRuns(filters: ReplayRunFilters): Promise<ReplayRunRecord[]> {
+    const limit = filters.limit ?? DEFAULT_LIMIT;
+    const values: Array<string | Date | number> = [];
+    const where: string[] = [];
+
+    if (filters.policyHash) {
+      values.push(filters.policyHash);
+      where.push(`candidate_policy_hash = $${values.length}`);
+    }
+    if (filters.since) {
+      values.push(filters.since);
+      where.push(`created_at >= $${values.length}`);
+    }
+    if (filters.until) {
+      values.push(filters.until);
+      where.push(`created_at <= $${values.length}`);
+    }
+
+    values.push(limit);
+    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const result = await pool.query(
+      `SELECT id, requested_by, baseline_policy_hash, candidate_policy_hash, candidate_policy_source, candidate_policy_ref, intent_type_filter, since, until, "limit", created_at
+       FROM policy_replay_runs
+       ${whereClause}
+       ORDER BY created_at ASC, id ASC
+       LIMIT $${values.length}`,
+      values
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      requestedBy: row.requested_by,
+      baselinePolicyHash: row.baseline_policy_hash,
+      candidatePolicyHash: row.candidate_policy_hash,
+      candidatePolicySource: row.candidate_policy_source,
+      candidatePolicyRef: row.candidate_policy_ref,
+      intentTypeFilter: row.intent_type_filter,
+      since: row.since,
+      until: row.until,
+      limit: row.limit,
+      createdAt: row.created_at
     }));
   }
 

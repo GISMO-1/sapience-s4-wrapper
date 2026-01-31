@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
-import type { ReplayReport } from "./api";
+import type { ReplayReport, PolicyDriftResponse } from "./api";
 
 vi.mock("./api", () => ({
   runPolicyReplay: vi.fn(),
@@ -11,6 +11,7 @@ vi.mock("./api", () => ({
   promotePolicy: vi.fn(),
   fetchPolicyLineageCurrent: vi.fn(),
   fetchPolicyQuality: vi.fn(),
+  fetchPolicyDrift: vi.fn(),
   recordPolicyOutcome: vi.fn()
 }));
 
@@ -81,8 +82,47 @@ const baseQuality = {
   }
 };
 
+const baseDrift: PolicyDriftResponse = {
+  traceId: "trace-1",
+  report: {
+    policyHash: "policy-1",
+    recent: {
+      window: { since: "2024-02-08T00:00:00Z", until: "2024-02-15T00:00:00Z" },
+      metrics: {
+        totalOutcomes: 2,
+        failureRate: 0.05,
+        overrideRate: 0.01,
+        qualityScore: 90,
+        replayAdded: 2,
+        replayRemoved: 1
+      }
+    },
+    baseline: {
+      window: { since: "2024-01-09T00:00:00Z", until: "2024-02-08T00:00:00Z" },
+      metrics: {
+        totalOutcomes: 5,
+        failureRate: 0.02,
+        overrideRate: 0.01,
+        qualityScore: 95,
+        replayAdded: 1,
+        replayRemoved: 1
+      }
+    },
+    deltas: {
+      failureRateDelta: 0.05,
+      overrideRateDelta: 0,
+      qualityScoreDelta: -5,
+      replayDelta: 1
+    },
+    health: {
+      state: "WATCH",
+      rationale: ["failureRateDelta >= 0.05 (0.0500)"]
+    }
+  }
+};
+
 test("promotion button remains disabled when impact guardrails block promotion", async () => {
-  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent } = await import("./api");
+  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
   vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
   vi.mocked(fetchReplayReport).mockResolvedValue({
     ...baseReport,
@@ -93,6 +133,7 @@ test("promotion button remains disabled when impact guardrails block promotion",
     policyHash: "policy-1",
     lineage: []
   });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
   const { fetchPolicyQuality } = await import("./api");
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
@@ -110,7 +151,7 @@ test("promotion button remains disabled when impact guardrails block promotion",
 });
 
 test("promotion button enables after approval details when impact is within thresholds", async () => {
-  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent } = await import("./api");
+  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
   vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
   vi.mocked(fetchReplayReport).mockResolvedValue(baseReport);
   vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
@@ -118,6 +159,7 @@ test("promotion button enables after approval details when impact is within thre
     policyHash: "policy-1",
     lineage: []
   });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
   const { fetchPolicyQuality } = await import("./api");
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
@@ -135,7 +177,7 @@ test("promotion button enables after approval details when impact is within thre
 });
 
 test("policy lineage renders without crashing", async () => {
-  const { fetchPolicyLineageCurrent } = await import("./api");
+  const { fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
   vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
     traceId: "trace-1",
     policyHash: "policy-1",
@@ -157,6 +199,7 @@ test("policy lineage renders without crashing", async () => {
       }
     ]
   });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
   const { fetchPolicyQuality } = await import("./api");
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
@@ -168,13 +211,14 @@ test("policy lineage renders without crashing", async () => {
 });
 
 test("policy sandbox renders outcome form and submits payload", async () => {
-  const { fetchPolicyLineageCurrent, fetchPolicyQuality, recordPolicyOutcome } = await import("./api");
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, recordPolicyOutcome } = await import("./api");
   vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
     traceId: "trace-1",
     policyHash: "policy-1",
     lineage: []
   });
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
   vi.mocked(recordPolicyOutcome).mockResolvedValue({ stored: true });
 
   render(<PolicySandbox />);
@@ -191,5 +235,23 @@ test("policy sandbox renders outcome form and submits payload", async () => {
         severity: 3
       })
     );
+  });
+});
+
+test("policy health section renders and calls drift endpoint", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+
+  render(<PolicySandbox />);
+
+  expect(await screen.findByText(/Policy health/i)).toBeInTheDocument();
+  await waitFor(() => {
+    expect(fetchPolicyDrift).toHaveBeenCalledWith("policy-1");
   });
 });

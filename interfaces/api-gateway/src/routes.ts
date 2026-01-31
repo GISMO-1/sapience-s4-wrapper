@@ -23,6 +23,7 @@ import { createPolicyLineageStore } from "./policy-lineage/store";
 import { createPolicyOutcomeStore } from "./policy-outcomes/store";
 import type { PolicyOutcomeRecord } from "./policy-outcomes/types";
 import { calculatePolicyQuality } from "./policy-quality/score";
+import { buildPolicyDriftReport, defaultDriftWindow } from "./policy-drift/compute";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -111,6 +112,14 @@ const policyQualityQuerySchema = z.object({
   policyHash: z.string().min(1),
   since: z.string().datetime().optional(),
   until: z.string().datetime().optional()
+});
+
+const policyDriftQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  baselineSince: z.string().datetime().optional(),
+  baselineUntil: z.string().datetime().optional()
 });
 
 const replayReportOutcomeQuerySchema = z.object({
@@ -407,6 +416,30 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       },
       metrics
     };
+  });
+
+  app.get("/v1/policy/drift", async (request) => {
+    const traceId = getTraceIdFromRequest(request);
+    const query = policyDriftQuerySchema.parse(request.query ?? {});
+    const now = new Date();
+    const defaults = defaultDriftWindow(now);
+    const recentSince = query.since ? new Date(query.since) : defaults.recent.since;
+    const recentUntil = query.until ? new Date(query.until) : defaults.recent.until;
+    const baselineUntil = query.baselineUntil ? new Date(query.baselineUntil) : recentSince;
+    const baselineSince = query.baselineSince
+      ? new Date(query.baselineSince)
+      : new Date(baselineUntil.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const report = await buildPolicyDriftReport({
+      policyHash: query.policyHash,
+      recentWindow: { since: recentSince, until: recentUntil },
+      baselineWindow: { since: baselineSince, until: baselineUntil },
+      outcomeStore,
+      replayStore,
+      lineageStore
+    });
+
+    return { traceId, report };
   });
 
   app.post("/v1/policy/replay", async (request, reply) => {

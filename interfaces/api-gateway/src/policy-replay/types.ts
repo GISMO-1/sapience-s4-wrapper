@@ -18,6 +18,13 @@ export type ReplayFilters = {
   limit?: number;
 };
 
+export type ReplayRunFilters = {
+  policyHash?: string;
+  since?: Date;
+  until?: Date;
+  limit?: number;
+};
+
 export type ReplayBaselineIntent = {
   traceId: string;
   intentType: Intent["intentType"];

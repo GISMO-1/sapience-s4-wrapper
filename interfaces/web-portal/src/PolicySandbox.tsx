@@ -3,6 +3,7 @@ import {
   fetchReplayReport,
   fetchTraceExplain,
   fetchPolicyLineageCurrent,
+  fetchPolicyTimeline,
   fetchPolicyQuality,
   fetchPolicyDrift,
   recordPolicyOutcome,
@@ -17,6 +18,7 @@ import {
   type PolicyQualityResponse,
   type PolicyDriftResponse,
   type PolicyLineageResponse,
+  type PolicyLifecycleTimeline,
   type PolicyImpactSimulationReport,
   type PromotionGuardrailDecision,
   type IntentDecisionResponse,
@@ -64,6 +66,8 @@ export function PolicySandbox() {
   const [promotionLoading, setPromotionLoading] = useState(false);
   const [lineage, setLineage] = useState<PolicyLineageResponse | null>(null);
   const [lineageError, setLineageError] = useState<string>("");
+  const [lifecycleTimeline, setLifecycleTimeline] = useState<PolicyLifecycleTimeline | null>(null);
+  const [lifecycleError, setLifecycleError] = useState<string>("");
   const [outcomeTraceId, setOutcomeTraceId] = useState("");
   const [outcomeType, setOutcomeType] = useState<PolicyOutcomeType>("success");
   const [outcomeSeverity, setOutcomeSeverity] = useState("1");
@@ -110,6 +114,25 @@ export function PolicySandbox() {
     };
     loadLineage();
   }, []);
+
+  useEffect(() => {
+    if (!lineage?.policyHash) {
+      setLifecycleTimeline(null);
+      setLifecycleError("");
+      return;
+    }
+    const loadTimeline = async () => {
+      setLifecycleError("");
+      try {
+        const response = await fetchPolicyTimeline(lineage.policyHash);
+        setLifecycleTimeline(response);
+      } catch (err) {
+        setLifecycleError((err as Error).message);
+        setLifecycleTimeline(null);
+      }
+    };
+    void loadTimeline();
+  }, [lineage?.policyHash]);
 
   useEffect(() => {
     const loadQuality = async () => {
@@ -472,6 +495,39 @@ export function PolicySandbox() {
     return "impact-badge impact-badge-low";
   };
 
+  const lifecycleBadgeClass = (state: string) => {
+    switch (state) {
+      case "ACTIVE":
+        return "lifecycle-badge lifecycle-badge-active";
+      case "SUPERSEDED":
+        return "lifecycle-badge lifecycle-badge-superseded";
+      case "APPROVED":
+        return "lifecycle-badge lifecycle-badge-approved";
+      case "GUARDED":
+        return "lifecycle-badge lifecycle-badge-guarded";
+      case "SIMULATED":
+        return "lifecycle-badge lifecycle-badge-simulated";
+      case "DRAFT":
+      default:
+        return "lifecycle-badge lifecycle-badge-draft";
+    }
+  };
+
+  const lifecycleEventLabel = (type: string) => {
+    switch (type) {
+      case "simulation":
+        return "Simulation";
+      case "guardrail_check":
+        return "Guardrail check";
+      case "approval":
+        return "Approval";
+      case "promotion":
+        return "Promotion";
+      default:
+        return type;
+    }
+  };
+
   return (
     <section className="policy-sandbox">
       <h2>Policy Sandbox</h2>
@@ -799,6 +855,41 @@ export function PolicySandbox() {
             {guardrailPromotionError && <span className="sandbox-error">{guardrailPromotionError}</span>}
           </div>
         </div>
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy Lifecycle</h3>
+        <p>Derived state and ordered lifecycle events for the active policy hash.</p>
+        {lifecycleError && <span className="sandbox-error">{lifecycleError}</span>}
+        {!lifecycleTimeline && !lifecycleError && <span>Loading lifecycle timeline...</span>}
+        {lifecycleTimeline && (
+          <>
+            <div className="sandbox-row">
+              <strong>Current state</strong>
+              <span className={lifecycleBadgeClass(lifecycleTimeline.state)}>{lifecycleTimeline.state}</span>
+            </div>
+            {lifecycleTimeline.events.length === 0 ? (
+              <div className="lifecycle-empty">No lifecycle events recorded yet.</div>
+            ) : (
+              <ul className="lifecycle-timeline">
+                {lifecycleTimeline.events.map((event, index) => (
+                  <li key={`${event.type}-${event.timestamp}-${event.actor}-${index}`}>
+                    <div className="lifecycle-event-header">
+                      <span className="lifecycle-event-type">{lifecycleEventLabel(event.type)}</span>
+                      <span className="lifecycle-event-time">
+                        {new Date(event.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="lifecycle-event-meta">
+                      <span className="lifecycle-event-actor">{event.actor}</span>
+                      <span className="lifecycle-event-rationale">{event.rationale}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </div>
 
       <div className="sandbox-card">

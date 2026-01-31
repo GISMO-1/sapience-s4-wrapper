@@ -361,6 +361,22 @@ export async function fetchPolicyLineageByHash(policyHash: string): Promise<Poli
   return fetchJson(buildUrl(`/v1/policy/lineage/${encodeURIComponent(policyHash)}`));
 }
 
+export type PolicyLifecycleEvent = {
+  type: "simulation" | "guardrail_check" | "approval" | "promotion";
+  timestamp: string;
+  actor: string;
+  rationale: string;
+};
+
+export type PolicyLifecycleTimeline = {
+  state: string;
+  events: PolicyLifecycleEvent[];
+};
+
+export async function fetchPolicyTimeline(policyHash: string): Promise<PolicyLifecycleTimeline> {
+  return fetchJson(buildUrl(`/v1/policy/timeline?policyHash=${encodeURIComponent(policyHash)}`));
+}
+
 export type PolicyOutcomeType = "success" | "failure" | "override" | "rollback";
 
 export type PolicyQualityResponse = {

@@ -1,8 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
-import type { ReplayReport, PolicyDriftResponse, PolicyImpactSimulationReport, PromotionGuardrailDecision } from "./api";
+import type {
+  ReplayReport,
+  PolicyDriftResponse,
+  PolicyImpactSimulationReport,
+  PromotionGuardrailDecision,
+  PolicyLifecycleTimeline
+} from "./api";
 
 vi.mock("./api", () => ({
   runPolicyReplay: vi.fn(),
@@ -17,7 +23,8 @@ vi.mock("./api", () => ({
   fetchIntentDecision: vi.fn(),
   approveIntent: vi.fn(),
   executeIntent: vi.fn(),
-  fetchPromotionCheck: vi.fn()
+  fetchPromotionCheck: vi.fn(),
+  fetchPolicyTimeline: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -182,6 +189,29 @@ const baseGuardrailDecision: PromotionGuardrailDecision = {
     lineageHead: null
   }
 };
+
+const baseTimeline: PolicyLifecycleTimeline = {
+  state: "ACTIVE",
+  events: [
+    {
+      type: "simulation",
+      timestamp: "2024-02-01T10:00:00Z",
+      actor: "analyst",
+      rationale: "Replay run run-1"
+    },
+    {
+      type: "promotion",
+      timestamp: "2024-02-01T12:00:00Z",
+      actor: "Reviewer",
+      rationale: "Regression results match baseline."
+    }
+  ]
+};
+
+beforeEach(async () => {
+  const { fetchPolicyTimeline } = await import("./api");
+  vi.mocked(fetchPolicyTimeline).mockResolvedValue(baseTimeline);
+});
 
 test("promotion button remains disabled when impact guardrails block promotion", async () => {
   const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");

@@ -49,3 +49,16 @@ export type GuardrailDecision = {
     lineageHead: PolicyLineageRecord | null;
   };
 };
+
+export type GuardrailCheckInput = {
+  policyHash: string;
+  evaluatedAt: string;
+  actor: string;
+  rationale: string;
+  decision: GuardrailDecision;
+};
+
+export type GuardrailCheckRecord = GuardrailCheckInput & {
+  id: string;
+  createdAt: string;
+};

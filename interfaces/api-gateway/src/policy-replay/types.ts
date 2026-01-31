@@ -1,6 +1,7 @@
 import type { Intent } from "../intent/intent-model";
 import type { PolicyDecision, PolicyDecisionResult, PolicyReason, RiskAssessment } from "../policy-code/types";
 import type { PolicyImpactReport } from "../policy-lifecycle/types";
+import type { PolicyQualityMetrics } from "../policy-quality/types";
 
 export type ReplayCandidateSource = "current" | "path" | "inline";
 
@@ -171,4 +172,12 @@ export type ReplayReport = {
     candidateRules: string[];
   }>;
   impact: PolicyImpactReport;
+  outcomeOverlay?: {
+    policyHash: string;
+    window: {
+      since: string;
+      until: string;
+    };
+    metrics: PolicyQualityMetrics;
+  };
 };

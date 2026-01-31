@@ -3,8 +3,12 @@ import {
   fetchReplayReport,
   fetchTraceExplain,
   fetchPolicyLineageCurrent,
+  fetchPolicyQuality,
+  recordPolicyOutcome,
   promotePolicy,
   runPolicyReplay,
+  type PolicyOutcomeType,
+  type PolicyQualityResponse,
   type PolicyLineageResponse,
   type ReplayCandidateSource,
   type ReplayReport
@@ -31,6 +35,16 @@ export function PolicySandbox() {
   const [promotionLoading, setPromotionLoading] = useState(false);
   const [lineage, setLineage] = useState<PolicyLineageResponse | null>(null);
   const [lineageError, setLineageError] = useState<string>("");
+  const [outcomeTraceId, setOutcomeTraceId] = useState("");
+  const [outcomeType, setOutcomeType] = useState<PolicyOutcomeType>("success");
+  const [outcomeSeverity, setOutcomeSeverity] = useState("1");
+  const [outcomeHumanOverride, setOutcomeHumanOverride] = useState(false);
+  const [outcomeNotes, setOutcomeNotes] = useState("");
+  const [outcomeStatus, setOutcomeStatus] = useState("");
+  const [outcomeError, setOutcomeError] = useState("");
+  const [policyQuality, setPolicyQuality] = useState<PolicyQualityResponse | null>(null);
+  const [policyQualityError, setPolicyQualityError] = useState("");
+  const [policyQualityLoading, setPolicyQualityLoading] = useState(false);
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -44,6 +58,25 @@ export function PolicySandbox() {
     };
     loadLineage();
   }, []);
+
+  useEffect(() => {
+    const loadQuality = async () => {
+      if (!lineage?.policyHash) {
+        return;
+      }
+      setPolicyQualityLoading(true);
+      setPolicyQualityError("");
+      try {
+        const response = await fetchPolicyQuality(lineage.policyHash);
+        setPolicyQuality(response);
+      } catch (err) {
+        setPolicyQualityError((err as Error).message);
+      } finally {
+        setPolicyQualityLoading(false);
+      }
+    };
+    void loadQuality();
+  }, [lineage?.policyHash]);
 
   const buildFilters = () => {
     const parsedLimit = Number(limit);
@@ -128,6 +161,36 @@ export function PolicySandbox() {
       setTraceExplain(JSON.stringify({ error: (err as Error).message }, null, 2));
     }
   };
+
+  const handleOutcomeSubmit = async () => {
+    setOutcomeStatus("");
+    setOutcomeError("");
+    try {
+      await recordPolicyOutcome({
+        traceId: outcomeTraceId.trim(),
+        outcomeType,
+        severity: Number(outcomeSeverity),
+        humanOverride: outcomeHumanOverride,
+        notes: outcomeNotes.trim() || undefined
+      });
+      setOutcomeStatus("Outcome recorded.");
+      setOutcomeTraceId("");
+      setOutcomeNotes("");
+      if (lineage?.policyHash) {
+        try {
+          const response = await fetchPolicyQuality(lineage.policyHash);
+          setPolicyQuality(response);
+        } catch (err) {
+          setPolicyQualityError((err as Error).message);
+        }
+      }
+    } catch (err) {
+      setOutcomeError((err as Error).message);
+    }
+  };
+
+  const severityValue = Number(outcomeSeverity);
+  const severityValid = Number.isFinite(severityValue) && severityValue >= 1 && severityValue <= 5;
 
   return (
     <section className="policy-sandbox">
@@ -257,6 +320,103 @@ export function PolicySandbox() {
             </table>
           </>
         )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy quality</h3>
+        {policyQualityLoading && <span>Loading quality metrics...</span>}
+        {policyQualityError && <span className="sandbox-error">{policyQualityError}</span>}
+        {!policyQualityLoading && !policyQuality && !policyQualityError && (
+          <span>Load an active policy to see outcome quality.</span>
+        )}
+        {policyQuality && (
+          <div className="report-grid">
+            <div>
+              <strong>Policy hash</strong>
+              <div>{policyQuality.policyHash}</div>
+            </div>
+            <div>
+              <strong>Total outcomes</strong>
+              <div>{policyQuality.metrics.totalOutcomes}</div>
+            </div>
+            <div>
+              <strong>Failure rate</strong>
+              <div>{(policyQuality.metrics.failureRate * 100).toFixed(1)}%</div>
+            </div>
+            <div>
+              <strong>Override rate</strong>
+              <div>{(policyQuality.metrics.overrideRate * 100).toFixed(1)}%</div>
+            </div>
+            <div>
+              <strong>Quality score</strong>
+              <div>{policyQuality.metrics.qualityScore.toFixed(1)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Record outcome</h3>
+        <div className="sandbox-row">
+          <label>
+            Trace ID
+            <input
+              type="text"
+              value={outcomeTraceId}
+              onChange={(event) => setOutcomeTraceId(event.target.value)}
+              placeholder="trace-id"
+            />
+          </label>
+          <label>
+            Outcome type
+            <select value={outcomeType} onChange={(event) => setOutcomeType(event.target.value as PolicyOutcomeType)}>
+              <option value="success">success</option>
+              <option value="failure">failure</option>
+              <option value="override">override</option>
+              <option value="rollback">rollback</option>
+            </select>
+          </label>
+          <label>
+            Severity (1-5)
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={outcomeSeverity}
+              onChange={(event) => setOutcomeSeverity(event.target.value)}
+            />
+          </label>
+          <label>
+            Human override
+            <input
+              type="checkbox"
+              checked={outcomeHumanOverride}
+              onChange={(event) => setOutcomeHumanOverride(event.target.checked)}
+            />
+          </label>
+        </div>
+        <div className="sandbox-row">
+          <label className="sandbox-notes">
+            Notes
+            <textarea
+              value={outcomeNotes}
+              onChange={(event) => setOutcomeNotes(event.target.value)}
+              rows={3}
+              placeholder="Optional context for the outcome"
+            />
+          </label>
+        </div>
+        <div className="sandbox-actions">
+          <button
+            type="button"
+            onClick={handleOutcomeSubmit}
+            disabled={!outcomeTraceId.trim() || !severityValid}
+          >
+            Record outcome
+          </button>
+          {outcomeStatus && <span className="sandbox-success">{outcomeStatus}</span>}
+          {outcomeError && <span className="sandbox-error">{outcomeError}</span>}
+        </div>
       </div>
 
       {report && (

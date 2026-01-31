@@ -2,8 +2,10 @@ import Fastify from "fastify";
 import { afterEach, expect, test, vi } from "vitest";
 import type { PolicyReplayStore } from "../src/policy-replay/replay-store";
 import type { ReplayResultRecord, ReplayRunRecord } from "../src/policy-replay/types";
+import type { PolicyOutcomeStore } from "../src/policy-outcomes/store";
 
 let replayStore: PolicyReplayStore;
+let outcomeStore: PolicyOutcomeStore;
 
 vi.mock("../src/policy-replay/replay-store", async () => {
   const actual = await vi.importActual<typeof import("../src/policy-replay/replay-store")>(
@@ -12,6 +14,16 @@ vi.mock("../src/policy-replay/replay-store", async () => {
   return {
     ...actual,
     createPolicyReplayStore: () => replayStore
+  };
+});
+
+vi.mock("../src/policy-outcomes/store", async () => {
+  const actual = await vi.importActual<typeof import("../src/policy-outcomes/store")>(
+    "../src/policy-outcomes/store"
+  );
+  return {
+    ...actual,
+    createPolicyOutcomeStore: () => outcomeStore
   };
 });
 
@@ -119,9 +131,33 @@ test("replay report aggregates totals, deltas, and stable ordering", async () =>
     getResults: async () => results,
     getRunTotals: async () => ({ count: 4, changed: 3, allow: 2, warn: 0, deny: 2 })
   };
+  outcomeStore = {
+    recordOutcome: async () => {
+      throw new Error("not used");
+    },
+    getOutcomesByTraceId: async () => [],
+    listOutcomes: async () => [
+      {
+        id: "outcome-1",
+        traceId: "trace-1",
+        intentType: "CREATE_PO",
+        policyHash: "cand-hash",
+        decision: "DENY",
+        outcomeType: "failure",
+        severity: 4,
+        humanOverride: false,
+        notes: null,
+        observedAt: new Date("2024-02-01T00:00:00Z"),
+        createdAt: new Date("2024-02-01T00:00:00Z")
+      }
+    ]
+  };
 
   const app = await buildApp();
-  const response = await app.inject({ method: "GET", url: "/v1/policy/replay/run-1/report" });
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/policy/replay/run-1/report?outcomesSince=2024-02-01T00:00:00Z&outcomesUntil=2024-02-02T00:00:00Z"
+  });
 
   expect(response.statusCode).toBe(200);
   const payload = response.json();
@@ -161,6 +197,17 @@ test("replay report aggregates totals, deltas, and stable ordering", async () =>
   expect(payload.topRuleChanges[1].direction).toBe("more_strict");
 
   expect(payload.topChangedExamples.map((entry: any) => entry.traceId)).toEqual(["trace-1", "trace-2", "trace-3"]);
+  expect(payload.outcomeOverlay).toMatchObject({
+    policyHash: "cand-hash",
+    window: { since: "2024-02-01T00:00:00.000Z", until: "2024-02-02T00:00:00.000Z" },
+    metrics: {
+      totalOutcomes: 1,
+      failureRate: 1,
+      overrideRate: 0,
+      weightedPenalty: 12,
+      qualityScore: 20
+    }
+  });
 
   await app.close();
 });

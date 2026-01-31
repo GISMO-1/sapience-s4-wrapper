@@ -4,11 +4,13 @@ import {
   fetchTraceExplain,
   fetchPolicyLineageCurrent,
   fetchPolicyQuality,
+  fetchPolicyDrift,
   recordPolicyOutcome,
   promotePolicy,
   runPolicyReplay,
   type PolicyOutcomeType,
   type PolicyQualityResponse,
+  type PolicyDriftResponse,
   type PolicyLineageResponse,
   type ReplayCandidateSource,
   type ReplayReport
@@ -45,6 +47,9 @@ export function PolicySandbox() {
   const [policyQuality, setPolicyQuality] = useState<PolicyQualityResponse | null>(null);
   const [policyQualityError, setPolicyQualityError] = useState("");
   const [policyQualityLoading, setPolicyQualityLoading] = useState(false);
+  const [policyDrift, setPolicyDrift] = useState<PolicyDriftResponse | null>(null);
+  const [policyDriftError, setPolicyDriftError] = useState("");
+  const [policyDriftLoading, setPolicyDriftLoading] = useState(false);
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -76,6 +81,25 @@ export function PolicySandbox() {
       }
     };
     void loadQuality();
+  }, [lineage?.policyHash]);
+
+  useEffect(() => {
+    const loadDrift = async () => {
+      if (!lineage?.policyHash) {
+        return;
+      }
+      setPolicyDriftLoading(true);
+      setPolicyDriftError("");
+      try {
+        const response = await fetchPolicyDrift(lineage.policyHash);
+        setPolicyDrift(response);
+      } catch (err) {
+        setPolicyDriftError((err as Error).message);
+      } finally {
+        setPolicyDriftLoading(false);
+      }
+    };
+    void loadDrift();
   }, [lineage?.policyHash]);
 
   const buildFilters = () => {
@@ -182,6 +206,12 @@ export function PolicySandbox() {
           setPolicyQuality(response);
         } catch (err) {
           setPolicyQualityError((err as Error).message);
+        }
+        try {
+          const response = await fetchPolicyDrift(lineage.policyHash);
+          setPolicyDrift(response);
+        } catch (err) {
+          setPolicyDriftError((err as Error).message);
         }
       }
     } catch (err) {
@@ -318,6 +348,83 @@ export function PolicySandbox() {
                 ))}
               </tbody>
             </table>
+          </>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy health</h3>
+        {policyDriftLoading && <span>Loading drift health...</span>}
+        {policyDriftError && <span className="sandbox-error">{policyDriftError}</span>}
+        {!policyDriftLoading && !policyDrift && !policyDriftError && (
+          <span>Load an active policy to see drift health.</span>
+        )}
+        {policyDrift && (
+          <>
+            <div className="report-grid">
+              <div>
+                <strong>Health state</strong>
+                <div>{policyDrift.report.health.state}</div>
+              </div>
+              <div>
+                <strong>Policy hash</strong>
+                <div>{policyDrift.report.policyHash}</div>
+              </div>
+              <div>
+                <strong>Replay delta</strong>
+                <div>{policyDrift.report.deltas.replayDelta}</div>
+              </div>
+            </div>
+            <div className="sandbox-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    <th>Recent</th>
+                    <th>Baseline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Failure rate</td>
+                    <td>{(policyDrift.report.recent.metrics.failureRate * 100).toFixed(2)}%</td>
+                    <td>{(policyDrift.report.baseline.metrics.failureRate * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <td>Override rate</td>
+                    <td>{(policyDrift.report.recent.metrics.overrideRate * 100).toFixed(2)}%</td>
+                    <td>{(policyDrift.report.baseline.metrics.overrideRate * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <td>Quality score</td>
+                    <td>{policyDrift.report.recent.metrics.qualityScore.toFixed(1)}</td>
+                    <td>{policyDrift.report.baseline.metrics.qualityScore.toFixed(1)}</td>
+                  </tr>
+                  <tr>
+                    <td>Replay added</td>
+                    <td>{policyDrift.report.recent.metrics.replayAdded}</td>
+                    <td>{policyDrift.report.baseline.metrics.replayAdded}</td>
+                  </tr>
+                  <tr>
+                    <td>Replay removed</td>
+                    <td>{policyDrift.report.recent.metrics.replayRemoved}</td>
+                    <td>{policyDrift.report.baseline.metrics.replayRemoved}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <strong>Rationale</strong>
+              {policyDrift.report.health.rationale.length ? (
+                <ul>
+                  {policyDrift.report.health.rationale.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div>No drift triggers in this window.</div>
+              )}
+            </div>
           </>
         )}
       </div>

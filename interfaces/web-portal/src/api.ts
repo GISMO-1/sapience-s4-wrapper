@@ -243,3 +243,56 @@ export async function recordPolicyOutcome(payload: {
 export async function fetchPolicyQuality(policyHash: string): Promise<PolicyQualityResponse> {
   return fetchJson(buildUrl(`/v1/policy/quality?policyHash=${encodeURIComponent(policyHash)}`));
 }
+
+export type DriftWindow = { since: string; until: string };
+
+export type DriftMetrics = {
+  totalOutcomes: number;
+  failureRate: number;
+  overrideRate: number;
+  qualityScore: number;
+  replayAdded: number;
+  replayRemoved: number;
+};
+
+export type DriftDeltas = {
+  failureRateDelta: number;
+  overrideRateDelta: number;
+  qualityScoreDelta: number;
+  replayDelta: number;
+};
+
+export type HealthState = "HEALTHY" | "WATCH" | "DEGRADED" | "CRITICAL";
+
+export type DriftReport = {
+  policyHash: string;
+  recent: { window: DriftWindow; metrics: DriftMetrics };
+  baseline: { window: DriftWindow; metrics: DriftMetrics };
+  deltas: DriftDeltas;
+  health: { state: HealthState; rationale: string[] };
+};
+
+export type PolicyDriftResponse = {
+  traceId: string;
+  report: DriftReport;
+};
+
+export async function fetchPolicyDrift(
+  policyHash: string,
+  windows?: { since?: string; until?: string; baselineSince?: string; baselineUntil?: string }
+): Promise<PolicyDriftResponse> {
+  const params = new URLSearchParams({ policyHash });
+  if (windows?.since) {
+    params.set("since", windows.since);
+  }
+  if (windows?.until) {
+    params.set("until", windows.until);
+  }
+  if (windows?.baselineSince) {
+    params.set("baselineSince", windows.baselineSince);
+  }
+  if (windows?.baselineUntil) {
+    params.set("baselineUntil", windows.baselineUntil);
+  }
+  return fetchJson(buildUrl(`/v1/policy/drift?${params.toString()}`));
+}

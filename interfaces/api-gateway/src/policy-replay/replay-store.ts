@@ -4,6 +4,7 @@ import type {
   ReplayBaselineIntent,
   ReplayFilters,
   ReplayResultRecord,
+  ReplayRunFilters,
   ReplayRunInput,
   ReplayRunRecord,
   ReplayTotals
@@ -12,6 +13,7 @@ import { PostgresPolicyReplayStore } from "./replay-store.pg";
 
 export interface PolicyReplayStore {
   listBaselineIntents(filters: ReplayFilters): Promise<ReplayBaselineIntent[]>;
+  listRuns(filters: ReplayRunFilters): Promise<ReplayRunRecord[]>;
   createRun(input: ReplayRunInput): Promise<ReplayRunRecord>;
   saveResults(runId: string, results: ReplayResultRecord[]): Promise<void>;
   getRun(runId: string): Promise<ReplayRunRecord | null>;
@@ -54,6 +56,34 @@ export class InMemoryPolicyReplayStore implements PolicyReplayStore {
           return createdDiff;
         }
         return a.traceId.localeCompare(b.traceId);
+      })
+      .slice(0, limit);
+  }
+
+  async listRuns(filters: ReplayRunFilters): Promise<ReplayRunRecord[]> {
+    const limit = filters.limit ?? 100;
+    const since = filters.since?.getTime();
+    const until = filters.until?.getTime();
+    return Array.from(this.runs.values())
+      .filter((run) => {
+        if (filters.policyHash && run.candidatePolicyHash !== filters.policyHash) {
+          return false;
+        }
+        const created = run.createdAt.getTime();
+        if (since && created < since) {
+          return false;
+        }
+        if (until && created > until) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const createdDiff = a.createdAt.getTime() - b.createdAt.getTime();
+        if (createdDiff !== 0) {
+          return createdDiff;
+        }
+        return a.id.localeCompare(b.id);
       })
       .slice(0, limit);
   }
@@ -125,6 +155,14 @@ class FallbackPolicyReplayStore implements PolicyReplayStore {
       return await this.primary.listBaselineIntents(filters);
     } catch (error) {
       return this.fallback.listBaselineIntents(filters);
+    }
+  }
+
+  async listRuns(filters: ReplayRunFilters): Promise<ReplayRunRecord[]> {
+    try {
+      return await this.primary.listRuns(filters);
+    } catch (error) {
+      return this.fallback.listRuns(filters);
     }
   }
 

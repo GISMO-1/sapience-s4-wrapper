@@ -26,6 +26,7 @@ import { calculatePolicyQuality } from "./policy-quality/score";
 import { buildPolicyDriftReport, defaultDriftWindow } from "./policy-drift/compute";
 import { createIntentApprovalStore } from "./intent-approvals/store";
 import type { IntentApprovalRecord } from "./intent-approvals/types";
+import { computePolicyImpactReport } from "./policy-impact/compute";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -86,6 +87,20 @@ const replayResultsQuerySchema = z.object({
 
 const replayRunQuerySchema = z.object({
   limit: z.string().optional()
+});
+
+const policyImpactRequestSchema = z.object({
+  candidatePolicy: z.union([
+    z.string().min(1),
+    z.object({
+      source: z.enum(["current", "path", "inline"]).default("inline"),
+      ref: z.string().optional(),
+      yaml: z.string().optional()
+    })
+  ]),
+  since: z.string().datetime(),
+  until: z.string().datetime(),
+  limit: z.number().int().positive().optional()
 });
 
 const promoteRequestSchema = z.object({
@@ -773,6 +788,46 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return { traceId, run };
+  });
+
+  app.post("/v1/policy/impact", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const body = policyImpactRequestSchema.parse(request.body ?? {});
+    const candidateRequest =
+      typeof body.candidatePolicy === "string"
+        ? { source: "inline" as const, yaml: body.candidatePolicy, ref: "inline" }
+        : body.candidatePolicy;
+
+    let candidate;
+    let currentPolicy;
+    try {
+      candidate = loadPolicyFromSource(candidateRequest);
+      currentPolicy = loadPolicyFromSource({ source: "current" });
+    } catch (error) {
+      if (error instanceof PolicySourceError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+
+    const since = new Date(body.since);
+    const until = new Date(body.until);
+    const intents = await replayStore.listBaselineIntents({
+      since,
+      until,
+      limit: body.limit
+    });
+    const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+    const report = computePolicyImpactReport({
+      currentPolicy,
+      candidatePolicy: candidate,
+      intents,
+      window: { since, until },
+      executionMode
+    });
+
+    return { traceId, ...report };
   });
 
   app.get("/v1/policy/replay/:runId", async (request, reply) => {

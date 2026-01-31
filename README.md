@@ -14,15 +14,42 @@ Sapience is a cloud-native wrapper that provides intent-driven APIs and event-dr
 Sapience is composed of domain services (procurement, supply chain, finance), an integration service that would eventually talk to SAP, an orchestration service that coordinates sagas, an API gateway, and an AI assistant service. Services communicate using Kafka-compatible events with a shared envelope. Each service owns its data in Postgres and exposes minimal REST APIs.
 
 ## Quickstart
+Local (no Docker):
 ```bash
-cp .env.example .env
-cd infra
-docker-compose up --build
+pnpm install
+pnpm -r build
+pnpm -r test
 ```
 
-Once running:
+Docker (compose):
+```bash
+docker compose -f infra/docker-compose.yaml up --build
+```
+
+URLs/ports:
+- API gateway: http://localhost:8080/health
 - Web portal: http://localhost:5173
-- API gateway: http://localhost:3000/health
+
+60-second demo flow:
+1. Send an intent.
+2. Run a replay.
+3. View the replay report.
+4. Record an outcome.
+5. View policy quality.
+6. View policy lineage.
+
+### Demo seed script
+Purpose: seed sample intents, run a replay, record outcomes, and fetch quality/lineage data. Inputs: `API_BASE` (defaults to `http://localhost:8080`). Outputs: printed IDs and URLs.
+
+Example command:
+```bash
+pnpm -C interfaces/api-gateway exec tsx ../../scripts/seed-demo.ts
+```
+
+Self-check:
+```bash
+API_BASE=http://localhost:8080 pnpm -C interfaces/api-gateway exec tsx ../../scripts/seed-demo.ts --self-check
+```
 
 ## Makefile shortcuts
 Purpose: provide consistent local dev commands for containers and tests. Inputs are local Docker and pnpm configuration; outputs are running containers, logs, or test results.
@@ -40,14 +67,14 @@ make test
 ## Endpoints and example curl commands
 ### API gateway intent routing
 ```bash
-curl -s -X POST http://localhost:3000/v1/intent \
+curl -s -X POST http://localhost:8080/v1/intent \
   -H 'content-type: application/json' \
   -d '{"text":"create a PO for laptops"}' | jq
 ```
 
 ### AI assist planner (gateway passthrough)
 ```bash
-curl -s -X POST http://localhost:3000/v1/assist \
+curl -s -X POST http://localhost:8080/v1/assist \
   -H 'content-type: application/json' \
   -d '{"text":"review invoice INV-2024"}' | jq
 ```
@@ -82,7 +109,7 @@ curl -s http://localhost:3004/v1/sap/purchase-orders/PO-1001 | jq
 The API gateway loads policy rules from `policies/policies.v1.yaml` and enforces deterministic, explainable decisions. The `/v1/policy/explain/:traceId` endpoint returns the policy hash alongside the decision, matched rules, and risk signals. To reload policies locally, set `POLICY_RELOAD_ENABLED=true` and call:
 
 ```bash
-curl -s -X POST http://localhost:3000/v1/policy/reload | jq
+curl -s -X POST http://localhost:8080/v1/policy/reload | jq
 ```
 
 Policy replay now includes an executive-ready impact report plus a minimal sandbox UI in the web portal. Promotion guardrails score replay impact and enforce blast-radius thresholds before activating new policies. Use the replay and promotion endpoints to compare baseline vs. candidate decisions:

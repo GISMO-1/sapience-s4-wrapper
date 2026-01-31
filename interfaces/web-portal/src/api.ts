@@ -482,6 +482,76 @@ export type PolicyVerificationResponse = {
   };
 };
 
+export type PolicyProvenanceMetadata = {
+  policyHash: string;
+  lifecycleState: string | null;
+  statusUpdatedAt: string | null;
+  version: string | null;
+  path: string | null;
+  source: string | null;
+  ref: string | null;
+  inlineYaml: string | null;
+  loadedAt: string | null;
+};
+
+export type PolicyProvenanceDeterminism = {
+  verified: boolean;
+  mismatches: PolicyVerificationMismatch[];
+  eventCount: number;
+  lastEventHash: string | null;
+  windows: {
+    drift: { recent: DriftWindow; baseline: DriftWindow };
+    quality: DriftWindow | null;
+  };
+};
+
+export type PolicyImpactSimulationSummary = {
+  evaluatedAt: string;
+  policyHashCurrent: string;
+  policyHashCandidate: string;
+  window: { since: string; until: string };
+  totals: {
+    intentsEvaluated: number;
+    newlyBlocked: number;
+    newlyAllowed: number;
+    approvalEscalations: number;
+    severityIncreases: number;
+    impactedIntents: number;
+  };
+  blastRadiusScore: number;
+};
+
+export type PolicyProvenanceReport = {
+  policyHash: string;
+  asOf: string;
+  metadata: PolicyProvenanceMetadata;
+  lifecycle: PolicyLifecycleTimeline;
+  guardrailChecks: Array<{
+    id: string;
+    policyHash: string;
+    evaluatedAt: string;
+    actor: string;
+    rationale: string;
+    decision: PromotionGuardrailDecision;
+    createdAt: string;
+  }>;
+  approvals: Array<{
+    id: string;
+    policyHash: string;
+    approvedBy: string;
+    approvedAt: string;
+    rationale: string;
+    acceptedRiskScore: number | null;
+    notes: string | null;
+    runId: string | null;
+    createdAt: string;
+  }>;
+  driftReport: DriftReport | null;
+  impactSimulationSummary: PolicyImpactSimulationSummary | null;
+  determinism: PolicyProvenanceDeterminism;
+  reportHash: string;
+};
+
 export async function fetchPolicyVerify(input: {
   policyHash: string;
   since?: string;
@@ -511,6 +581,18 @@ export async function fetchPolicyVerify(input: {
     params.set("qualityUntil", input.qualityUntil);
   }
   return fetchJson(buildUrl(`/v1/policy/verify?${params.toString()}`));
+}
+
+export async function fetchPolicyProvenance(policyHash: string): Promise<{ traceId: string; report: PolicyProvenanceReport }> {
+  return fetchJson(buildUrl(`/v1/policy/provenance?policyHash=${encodeURIComponent(policyHash)}`));
+}
+
+export async function fetchPolicyProvenanceMarkdown(policyHash: string): Promise<string> {
+  const response = await fetch(buildUrl(`/v1/policy/provenance?policyHash=${encodeURIComponent(policyHash)}&format=md`));
+  if (!response.ok) {
+    throw new Error(`Policy provenance markdown request failed (${response.status})`);
+  }
+  return response.text();
 }
 
 export type PolicyEvent = {

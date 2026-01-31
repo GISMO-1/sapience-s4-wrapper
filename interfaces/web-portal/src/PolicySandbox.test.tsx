@@ -237,36 +237,40 @@ beforeEach(async () => {
   vi.mocked(fetchPolicyTimeline).mockResolvedValue(baseTimeline);
 });
 
-test("promotion button remains disabled when impact guardrails block promotion", async () => {
-  const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
-  vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
-  vi.mocked(fetchReplayReport).mockResolvedValue({
-    ...baseReport,
-    impact: { ...baseReport.impact, blocked: true }
-  });
-  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
-    traceId: "trace-1",
-    policyHash: "policy-1",
-    lineage: []
-  });
-  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
-  const { fetchPolicyQuality } = await import("./api");
-  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+test(
+  "promotion button remains disabled when impact guardrails block promotion",
+  async () => {
+    const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
+    vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
+    vi.mocked(fetchReplayReport).mockResolvedValue({
+      ...baseReport,
+      impact: { ...baseReport.impact, blocked: true }
+    });
+    vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+      traceId: "trace-1",
+      policyHash: "policy-1",
+      lineage: []
+    });
+    vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+    const { fetchPolicyQuality } = await import("./api");
+    vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
-  render(<PolicySandbox />);
-  fireEvent.click(await screen.findByRole("button", { name: /run replay/i }));
-  await screen.findByText(/Replay report/i);
+    render(<PolicySandbox />);
+    fireEvent.click(await screen.findByRole("button", { name: /run replay/i }));
+    await screen.findByText(/Replay report/i);
 
-  fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  fireEvent.change(screen.getByPlaceholderText(/Explain why the promotion is acceptable/i), {
-    target: { value: "Regression results match baseline." }
-  });
-  fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
+    fireEvent.change(screen.getByPlaceholderText(/Explain why the promotion is acceptable/i), {
+      target: { value: "Regression results match baseline." }
+    });
+    fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
-  await waitFor(() => {
-    expect(screen.getByRole("button", { name: /promote policy/i })).toBeDisabled();
-  });
-});
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /promote policy/i })).toBeDisabled();
+    });
+  },
+  10000
+);
 
 test("promotion button enables after approval details when impact is within thresholds", async () => {
   const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");

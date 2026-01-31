@@ -2,6 +2,7 @@ import { useState } from "react";
 import { sendIntent } from "./api";
 import { PolicySandbox } from "./PolicySandbox";
 import { TraceViewer } from "./TraceViewer";
+import { PolicyProvenancePanel } from "./PolicyProvenancePanel";
 
 export function App() {
   const [input, setInput] = useState("");
@@ -48,6 +49,7 @@ export function App() {
       </section>
       <PolicySandbox />
       <TraceViewer />
+      <PolicyProvenancePanel />
     </div>
   );
 }

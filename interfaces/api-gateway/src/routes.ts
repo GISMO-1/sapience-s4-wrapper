@@ -36,6 +36,7 @@ import { createPolicyApprovalStore } from "./policy-approvals/store";
 import { buildPolicyLifecycleTimeline } from "./policy-lifecycle/timeline";
 import { buildPolicyEventLog } from "./policy-events/projector";
 import { verifyPolicyDeterminism } from "./policy-verifier/verify";
+import { buildPolicyProvenanceMarkdown, buildPolicyProvenanceReport } from "./policy-provenance/build";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -203,6 +204,11 @@ const policyVerifyQuerySchema = z.object({
   baselineUntil: z.string().datetime().optional(),
   qualitySince: z.string().datetime().optional(),
   qualityUntil: z.string().datetime().optional()
+});
+
+const policyProvenanceQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  format: z.enum(["md"]).optional()
 });
 
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
@@ -892,6 +898,34 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       activePolicyHash: activeSnapshot.info.hash
     });
     return { traceId, policyHash: parsed.data.policyHash, ...result };
+  });
+
+  app.get("/v1/policy/provenance", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = policyProvenanceQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid policy provenance request", traceId };
+    }
+    const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const report = await buildPolicyProvenanceReport({
+      policyHash: parsed.data.policyHash,
+      activePolicyHash: activeSnapshot.info.hash,
+      lifecycleStore,
+      lineageStore,
+      replayStore,
+      guardrailCheckStore,
+      approvalStore: policyApprovalStore,
+      outcomeStore,
+      policyInfo: activeSnapshot.info
+    });
+
+    if (parsed.data.format === "md") {
+      reply.type("text/markdown; charset=utf-8");
+      return buildPolicyProvenanceMarkdown(report);
+    }
+
+    return { traceId, report };
   });
 
   app.post("/v1/policy/replay", async (request, reply) => {

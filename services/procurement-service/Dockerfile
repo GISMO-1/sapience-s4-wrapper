@@ -1,6 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
+COPY tsconfig.base.json /tsconfig.base.json
 COPY services/procurement-service/package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile=false
 COPY services/procurement-service/tsconfig.json tsconfig.base.json ./

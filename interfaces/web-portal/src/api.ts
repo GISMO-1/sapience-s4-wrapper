@@ -462,3 +462,84 @@ export async function fetchPolicyDrift(
   }
   return fetchJson(buildUrl(`/v1/policy/drift?${params.toString()}`));
 }
+
+export type PolicyVerificationMismatch = {
+  field: string;
+  expected: unknown;
+  actual: unknown;
+};
+
+export type PolicyVerificationResponse = {
+  traceId: string;
+  policyHash: string;
+  verified: boolean;
+  mismatches: PolicyVerificationMismatch[];
+  eventCount: number;
+  lastEventHash: string | null;
+  windows: {
+    drift: { recent: DriftWindow; baseline: DriftWindow };
+    quality: DriftWindow | null;
+  };
+};
+
+export async function fetchPolicyVerify(input: {
+  policyHash: string;
+  since?: string;
+  until?: string;
+  baselineSince?: string;
+  baselineUntil?: string;
+  qualitySince?: string;
+  qualityUntil?: string;
+}): Promise<PolicyVerificationResponse> {
+  const params = new URLSearchParams({ policyHash: input.policyHash });
+  if (input.since) {
+    params.set("since", input.since);
+  }
+  if (input.until) {
+    params.set("until", input.until);
+  }
+  if (input.baselineSince) {
+    params.set("baselineSince", input.baselineSince);
+  }
+  if (input.baselineUntil) {
+    params.set("baselineUntil", input.baselineUntil);
+  }
+  if (input.qualitySince) {
+    params.set("qualitySince", input.qualitySince);
+  }
+  if (input.qualityUntil) {
+    params.set("qualityUntil", input.qualityUntil);
+  }
+  return fetchJson(buildUrl(`/v1/policy/verify?${params.toString()}`));
+}
+
+export type PolicyEvent = {
+  eventId: string;
+  occurredAt: string;
+  actor: string | null;
+  traceId: string | null;
+  policyHash: string | null;
+  kind: string;
+  payload: Record<string, unknown>;
+  parentEventId: string | null;
+  eventHash: string;
+};
+
+export async function fetchPolicyEvents(input: {
+  policyHash: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}): Promise<{ traceId: string; policyHash: string; events: PolicyEvent[] }> {
+  const params = new URLSearchParams({ policyHash: input.policyHash });
+  if (input.since) {
+    params.set("since", input.since);
+  }
+  if (input.until) {
+    params.set("until", input.until);
+  }
+  if (input.limit) {
+    params.set("limit", String(input.limit));
+  }
+  return fetchJson(buildUrl(`/v1/policy/events?${params.toString()}`));
+}

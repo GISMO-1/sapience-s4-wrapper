@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
@@ -7,7 +7,8 @@ import type {
   PolicyDriftResponse,
   PolicyImpactSimulationReport,
   PromotionGuardrailDecision,
-  PolicyLifecycleTimeline
+  PolicyLifecycleTimeline,
+  PolicyVerificationResponse
 } from "./api";
 
 vi.mock("./api", () => ({
@@ -24,7 +25,8 @@ vi.mock("./api", () => ({
   approveIntent: vi.fn(),
   executeIntent: vi.fn(),
   fetchPromotionCheck: vi.fn(),
-  fetchPolicyTimeline: vi.fn()
+  fetchPolicyTimeline: vi.fn(),
+  fetchPolicyVerify: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -130,6 +132,28 @@ const baseDrift: PolicyDriftResponse = {
       state: "WATCH",
       rationale: ["failureRateDelta >= 0.05 (0.0500)"]
     }
+  }
+};
+
+const baseVerification: PolicyVerificationResponse = {
+  traceId: "trace-1",
+  policyHash: "policy-1",
+  verified: false,
+  mismatches: [
+    {
+      field: "quality",
+      expected: { qualityScore: 90 },
+      actual: { qualityScore: 80 }
+    }
+  ],
+  eventCount: 4,
+  lastEventHash: "event-hash-1",
+  windows: {
+    drift: {
+      recent: { since: "2024-02-08T00:00:00Z", until: "2024-02-15T00:00:00Z" },
+      baseline: { since: "2024-01-09T00:00:00Z", until: "2024-02-08T00:00:00Z" }
+    },
+    quality: null
   }
 };
 
@@ -353,6 +377,32 @@ test("policy health section renders and calls drift endpoint", async () => {
   });
 });
 
+test("determinism panel verifies and shows first mismatch", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, fetchPolicyVerify } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyVerify).mockResolvedValue(baseVerification);
+
+  render(<PolicySandbox />);
+
+  const policyHashInput = await screen.findByLabelText(/Policy hash/i);
+  fireEvent.change(policyHashInput, { target: { value: "policy-1" } });
+
+  fireEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+  await waitFor(() => {
+    expect(fetchPolicyVerify).toHaveBeenCalledWith(expect.objectContaining({ policyHash: "policy-1" }));
+  });
+
+  expect(await screen.findByText(/INCONSISTENT/i)).toBeInTheDocument();
+  expect(screen.getByText(/First mismatch/i)).toBeInTheDocument();
+});
+
 test("policy impact simulation renders blast radius summary", async () => {
   const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, fetchPolicyImpactReport } =
     await import("./api");
@@ -367,17 +417,24 @@ test("policy impact simulation renders blast radius summary", async () => {
 
   render(<PolicySandbox />);
 
-  fireEvent.change(await screen.findByLabelText(/Candidate policy/i), {
+  const impactHeading = await screen.findByRole("heading", { name: /Policy Impact Simulation/i });
+  const impactCard = impactHeading.closest(".sandbox-card");
+  if (!impactCard) {
+    throw new Error("Impact card not found");
+  }
+  const impactScope = within(impactCard);
+
+  fireEvent.change(await impactScope.findByLabelText(/Candidate policy/i), {
     target: { value: "version: \"v1\"\n" }
   });
-  fireEvent.change(await screen.findByLabelText(/Since/i), {
+  fireEvent.change(await impactScope.findByLabelText(/Since/i), {
     target: { value: "2024-02-01T00:00" }
   });
-  fireEvent.change(await screen.findByLabelText(/Until/i), {
+  fireEvent.change(await impactScope.findByLabelText(/Until/i), {
     target: { value: "2024-02-02T00:00" }
   });
 
-  fireEvent.click(await screen.findByRole("button", { name: /Run simulation/i }));
+  fireEvent.click(await impactScope.findByRole("button", { name: /Run simulation/i }));
 
   await waitFor(() => {
     expect(fetchPolicyImpactReport).toHaveBeenCalledWith(

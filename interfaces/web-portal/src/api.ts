@@ -427,6 +427,7 @@ export type PolicyLifecycleEvent = {
   timestamp: string;
   actor: string;
   rationale: string;
+  decisionId?: string;
 };
 
 export type PolicyLifecycleTimeline = {
@@ -728,6 +729,9 @@ export type PolicyProvenanceReport = {
   }>;
   driftReport: DriftReport | null;
   impactSimulationSummary: PolicyImpactSimulationSummary | null;
+  decisionLedger: Partial<
+    Record<"EXECUTION" | "PROMOTION" | "ROLLBACK" | "COUNTERFACTUAL", string>
+  >;
   determinism: PolicyProvenanceDeterminism;
   reportHash: string;
 };
@@ -845,4 +849,46 @@ export async function fetchPolicyEvents(input: {
     params.set("limit", String(input.limit));
   }
   return fetchJson(buildUrl(`/v1/policy/events?${params.toString()}`));
+}
+
+export type DecisionRationaleBlock = {
+  type: "RULE_EVALUATION" | "GUARDRAIL_CHECK" | "THRESHOLD_CROSSED" | "HUMAN_OVERRIDE";
+  summary: string;
+  entries: string[];
+};
+
+export type DecisionAcceptedRisk = {
+  severity: "LOW" | "MEDIUM" | "HIGH";
+  justification: string;
+  reviewer?: string | null;
+  score?: number | null;
+};
+
+export type DecisionRationale = {
+  decisionId: string;
+  traceId: string;
+  policyHash: string;
+  decisionType: "EXECUTION" | "PROMOTION" | "ROLLBACK" | "COUNTERFACTUAL";
+  outcome: "ALLOW" | "DENY" | "WARN" | "FAIL";
+  confidenceScore: number;
+  rationaleBlocks: DecisionRationaleBlock[];
+  rejectedAlternatives: Array<{ label: string; delta: number; details?: string | null }>;
+  acceptedRisk: DecisionAcceptedRisk;
+  timestamps: { decidedAt: string; recordedAt: string };
+};
+
+export async function fetchDecisionRationale(decisionId: string): Promise<{ traceId: string; rationale: DecisionRationale }> {
+  return fetchJson(buildUrl(`/v1/decision/${encodeURIComponent(decisionId)}`));
+}
+
+export async function fetchDecisionsByTraceId(
+  traceId: string
+): Promise<{ traceId: string; decisions: DecisionRationale[] }> {
+  return fetchJson(buildUrl(`/v1/trace/${encodeURIComponent(traceId)}/decisions`));
+}
+
+export async function fetchDecisionsByPolicyHash(
+  policyHash: string
+): Promise<{ traceId: string; decisions: DecisionRationale[] }> {
+  return fetchJson(buildUrl(`/v1/policy/${encodeURIComponent(policyHash)}/decisions`));
 }

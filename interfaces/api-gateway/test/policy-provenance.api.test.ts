@@ -14,6 +14,8 @@ import type { PolicyOutcomeStore } from "../src/policy-outcomes/store";
 import { InMemoryPolicyOutcomeStore } from "../src/policy-outcomes/store";
 import type { PolicyRollbackStore } from "../src/policy-rollback/store";
 import { InMemoryPolicyRollbackStore } from "../src/policy-rollback/store";
+import type { DecisionRationaleStore } from "../src/decision-rationale/store";
+import { InMemoryDecisionRationaleStore } from "../src/decision-rationale/store";
 import type { DriftReport } from "../src/policy-drift/types";
 import type { PolicyImpactReport } from "../src/policy-impact/types";
 
@@ -24,7 +26,8 @@ const stores = vi.hoisted(() => ({
   guardrailCheckStore: null as GuardrailCheckStore | null,
   approvalStore: null as PolicyApprovalStore | null,
   outcomeStore: null as PolicyOutcomeStore | null,
-  rollbackStore: null as PolicyRollbackStore | null
+  rollbackStore: null as PolicyRollbackStore | null,
+  decisionRationaleStore: null as DecisionRationaleStore | null
 }));
 
 vi.mock("../src/policy-lifecycle/store", async () => {
@@ -86,6 +89,16 @@ vi.mock("../src/policy-rollback/store", async () => {
   return {
     ...actual,
     createPolicyRollbackStore: () => stores.rollbackStore as PolicyRollbackStore
+  };
+});
+
+vi.mock("../src/decision-rationale/store", async () => {
+  const actual = await vi.importActual<typeof import("../src/decision-rationale/store")>(
+    "../src/decision-rationale/store"
+  );
+  return {
+    ...actual,
+    createDecisionRationaleStore: () => stores.decisionRationaleStore as DecisionRationaleStore
   };
 });
 
@@ -212,6 +225,7 @@ test("returns provenance report with markdown export", async () => {
 
   const outcomeStore = new InMemoryPolicyOutcomeStore();
   const rollbackStore = new InMemoryPolicyRollbackStore();
+  const decisionRationaleStore = new InMemoryDecisionRationaleStore();
   await outcomeStore.recordOutcome({
     traceId: "trace-1",
     intentType: "CREATE_PO",
@@ -270,6 +284,7 @@ test("returns provenance report with markdown export", async () => {
   stores.approvalStore = approvalStore;
   stores.outcomeStore = outcomeStore;
   stores.rollbackStore = rollbackStore;
+  stores.decisionRationaleStore = decisionRationaleStore;
 
   const app = await buildApp();
 

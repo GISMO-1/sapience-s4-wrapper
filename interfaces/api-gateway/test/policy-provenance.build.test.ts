@@ -6,6 +6,7 @@ import { InMemoryGuardrailCheckStore } from "../src/policy-promotion-guardrails/
 import { InMemoryPolicyApprovalStore } from "../src/policy-approvals/store";
 import { InMemoryPolicyOutcomeStore } from "../src/policy-outcomes/store";
 import { InMemoryPolicyRollbackStore } from "../src/policy-rollback/store";
+import { InMemoryDecisionRationaleStore } from "../src/decision-rationale/store";
 import { buildPolicyProvenanceReport } from "../src/policy-provenance/build";
 import type { DriftReport } from "../src/policy-drift/types";
 import type { PolicyImpactReport } from "../src/policy-impact/types";
@@ -201,6 +202,7 @@ async function seedStores() {
   });
 
   const rollbackStore = new InMemoryPolicyRollbackStore();
+  const decisionRationaleStore = new InMemoryDecisionRationaleStore();
 
   return {
     lifecycleStore,
@@ -209,7 +211,8 @@ async function seedStores() {
     guardrailCheckStore,
     approvalStore,
     outcomeStore,
-    rollbackStore
+    rollbackStore,
+    decisionRationaleStore
   };
 }
 
@@ -229,7 +232,8 @@ test("builds a deterministic provenance report with ordered sections", async () 
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
     outcomeStore: stores.outcomeStore,
-    rollbackStore: stores.rollbackStore
+    rollbackStore: stores.rollbackStore,
+    decisionRationaleStore: stores.decisionRationaleStore
   });
 
   expect(report.policyHash).toBe(policyHash);
@@ -264,7 +268,8 @@ test("rollbacks are included in provenance timelines", async () => {
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
     outcomeStore: stores.outcomeStore,
-    rollbackStore: stores.rollbackStore
+    rollbackStore: stores.rollbackStore,
+    decisionRationaleStore: stores.decisionRationaleStore
   });
 
   expect(report.lastRollback?.eventHash).toBe("rollback-1");
@@ -283,7 +288,8 @@ test("produces a stable report hash across builds", async () => {
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
     outcomeStore: stores.outcomeStore,
-    rollbackStore: stores.rollbackStore
+    rollbackStore: stores.rollbackStore,
+    decisionRationaleStore: stores.decisionRationaleStore
   });
 
   const second = await buildPolicyProvenanceReport({
@@ -295,7 +301,8 @@ test("produces a stable report hash across builds", async () => {
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
     outcomeStore: stores.outcomeStore,
-    rollbackStore: stores.rollbackStore
+    rollbackStore: stores.rollbackStore,
+    decisionRationaleStore: stores.decisionRationaleStore
   });
 
   expect(second.reportHash).toBe(first.reportHash);

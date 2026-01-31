@@ -1,0 +1,246 @@
+[
+  {
+    "decisionId": "ec695c53e64bbd52080d6ec0cdd924c20342dd7b2e3ee8d03d919a62d60ca310",
+    "traceId": "trace-a",
+    "policyHash": "policy-hash-a",
+    "decisionType": "EXECUTION",
+    "outcome": "ALLOW",
+    "confidenceScore": 0.67,
+    "rationaleBlocks": [
+      {
+        "type": "RULE_EVALUATION",
+        "summary": "1 rule evaluation(s) matched.",
+        "entries": [
+          "Rule rule-1 → ALLOW: Within baseline guardrails."
+        ]
+      },
+      {
+        "type": "THRESHOLD_CROSSED",
+        "summary": "Thresholds evaluated from matched rules.",
+        "entries": [
+          "Rule rule-1: Within baseline guardrails."
+        ]
+      }
+    ],
+    "rejectedAlternatives": [],
+    "acceptedRisk": {
+      "severity": "LOW",
+      "justification": "Risk level low recorded for execution.",
+      "reviewer": null,
+      "score": null
+    },
+    "timestamps": {
+      "decidedAt": "2024-04-02T09:00:00.000Z",
+      "recordedAt": "2024-04-02T09:00:00.000Z"
+    }
+  },
+  {
+    "decisionId": "140c4df83719df8273df624bb9fe99dbc55660cf70c07d9b3f04cad772d248f8",
+    "traceId": "trace-b",
+    "policyHash": "policy-hash-a",
+    "decisionType": "EXECUTION",
+    "outcome": "WARN",
+    "confidenceScore": 0.5767,
+    "rationaleBlocks": [
+      {
+        "type": "RULE_EVALUATION",
+        "summary": "1 rule evaluation(s) matched.",
+        "entries": [
+          "Rule rule-2 → WARN: Requires manual approval."
+        ]
+      },
+      {
+        "type": "THRESHOLD_CROSSED",
+        "summary": "Thresholds evaluated from matched rules.",
+        "entries": [
+          "Rule rule-2: Requires manual approval."
+        ]
+      },
+      {
+        "type": "HUMAN_OVERRIDE",
+        "summary": "Manual approvals recorded.",
+        "entries": [
+          "OPS_REVIEWER approved by reviewer: Reviewed manually."
+        ]
+      }
+    ],
+    "rejectedAlternatives": [],
+    "acceptedRisk": {
+      "severity": "MEDIUM",
+      "justification": "Low confidence intent.",
+      "reviewer": null,
+      "score": null
+    },
+    "timestamps": {
+      "decidedAt": "2024-04-02T10:00:00.000Z",
+      "recordedAt": "2024-04-02T10:00:00.000Z"
+    }
+  },
+  {
+    "decisionId": "4b858279651dd6a7727eb25751ebf49461dd229a020b4cfb3bbad1257ec69aed",
+    "traceId": "trace-promo",
+    "policyHash": "policy-hash-b",
+    "decisionType": "PROMOTION",
+    "outcome": "WARN",
+    "confidenceScore": 0.9175,
+    "rationaleBlocks": [
+      {
+        "type": "RULE_EVALUATION",
+        "summary": "Guardrail impact summary.",
+        "entries": [
+          "Impacted intents: 4",
+          "Blast radius score: 42.00"
+        ]
+      },
+      {
+        "type": "GUARDRAIL_CHECK",
+        "summary": "Promotion guardrail evaluation.",
+        "entries": [
+          "BLAST_RADIUS_EXCEEDED: Blast radius exceeds threshold. (metric 42 vs threshold 25)"
+        ]
+      },
+      {
+        "type": "THRESHOLD_CROSSED",
+        "summary": "Guardrail thresholds evaluated.",
+        "entries": [
+          "Threshold BLAST_RADIUS_EXCEEDED: Blast radius exceeds threshold. (metric 42 vs threshold 25)"
+        ]
+      },
+      {
+        "type": "HUMAN_OVERRIDE",
+        "summary": "Reviewer acknowledgement recorded.",
+        "entries": [
+          "Approval by reviewer: Promotion approved."
+        ]
+      }
+    ],
+    "rejectedAlternatives": [
+      {
+        "label": "Outcome failure",
+        "delta": 2,
+        "details": "severity Δ 0.6000"
+      },
+      {
+        "label": "Outcome override",
+        "delta": 0,
+        "details": null
+      },
+      {
+        "label": "Outcome rollback",
+        "delta": -1,
+        "details": null
+      },
+      {
+        "label": "Outcome success",
+        "delta": -2,
+        "details": null
+      }
+    ],
+    "acceptedRisk": {
+      "severity": "MEDIUM",
+      "justification": "Promotion approved with accepted risk.",
+      "reviewer": "reviewer",
+      "score": 0.55
+    },
+    "timestamps": {
+      "decidedAt": "2024-05-01T10:00:00.000Z",
+      "recordedAt": "2024-05-01T10:00:00.000Z"
+    }
+  },
+  {
+    "decisionId": "dc6e17305d0b4d54adcbd10edd0a8261f41cb0d63713291232ba6e0fd7ce8912",
+    "traceId": "trace-rollback",
+    "policyHash": "policy-hash-a",
+    "decisionType": "ROLLBACK",
+    "outcome": "ALLOW",
+    "confidenceScore": 1,
+    "rationaleBlocks": [
+      {
+        "type": "RULE_EVALUATION",
+        "summary": "Rollback decision rationale.",
+        "entries": [
+          "Rollback decision passed validation checks."
+        ]
+      },
+      {
+        "type": "HUMAN_OVERRIDE",
+        "summary": "Rollback approval recorded.",
+        "entries": [
+          "Rollback executed by sre: Rollback after incident."
+        ]
+      }
+    ],
+    "rejectedAlternatives": [],
+    "acceptedRisk": {
+      "severity": "LOW",
+      "justification": "Rollback after incident.",
+      "reviewer": "sre",
+      "score": null
+    },
+    "timestamps": {
+      "decidedAt": "2024-06-01T12:00:00.000Z",
+      "recordedAt": "2024-06-01T12:00:00.000Z"
+    }
+  },
+  {
+    "decisionId": "e5b3d1f9391ad55e349e766a307817dfc4d07a2da54947040b42e503727be0aa",
+    "traceId": "trace-counter",
+    "policyHash": "policy-hash-b",
+    "decisionType": "COUNTERFACTUAL",
+    "outcome": "WARN",
+    "confidenceScore": 0.79,
+    "rationaleBlocks": [
+      {
+        "type": "RULE_EVALUATION",
+        "summary": "Counterfactual window summary.",
+        "entries": [
+          "Window: 2024-05-01T00:00:00.000Z → 2024-06-01T00:00:00.000Z",
+          "Intents affected: 8",
+          "Traces affected: 6"
+        ]
+      },
+      {
+        "type": "THRESHOLD_CROSSED",
+        "summary": "Counterfactual deltas evaluated.",
+        "entries": [
+          "Outcome failure delta: 2",
+          "Outcome override delta: 0",
+          "Outcome rollback delta: -1",
+          "Outcome success delta: -2"
+        ]
+      }
+    ],
+    "rejectedAlternatives": [
+      {
+        "label": "Outcome failure",
+        "delta": 2,
+        "details": "severity Δ 0.6000"
+      },
+      {
+        "label": "Outcome override",
+        "delta": 0,
+        "details": null
+      },
+      {
+        "label": "Outcome rollback",
+        "delta": -1,
+        "details": null
+      },
+      {
+        "label": "Outcome success",
+        "delta": -2,
+        "details": null
+      }
+    ],
+    "acceptedRisk": {
+      "severity": "LOW",
+      "justification": "Counterfactual report counterfactual-report-hash generated.",
+      "reviewer": null,
+      "score": null
+    },
+    "timestamps": {
+      "decidedAt": "2024-06-01T00:00:00.000Z",
+      "recordedAt": "2024-06-01T00:00:00.000Z"
+    }
+  }
+]

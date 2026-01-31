@@ -6,6 +6,7 @@ import type { DriftReport, DriftWindow } from "../policy-drift/types";
 import type { PolicyImpactReport } from "../policy-impact/types";
 import type { VerificationMismatch } from "../policy-verifier/types";
 import type { RollbackEvent } from "../policy-rollback/types";
+import type { DecisionType } from "../decision-rationale/types";
 
 export type PolicyProvenanceMetadata = {
   policyHash: string;
@@ -49,6 +50,7 @@ export type PolicyProvenanceReport = {
   approvals: PolicyApprovalRecord[];
   driftReport: DriftReport | null;
   impactSimulationSummary: PolicyImpactSimulationSummary | null;
+  decisionLedger: Partial<Record<DecisionType, string>>;
   counterfactualReportHash?: string;
   determinism: PolicyDeterminismVerification;
   reportHash: string;

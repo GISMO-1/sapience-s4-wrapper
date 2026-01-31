@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { now } from "../testing/determinism";
 import type { PolicySnapshotStatus, PolicyLifecycleRecord, PolicyApproval } from "./types";
 
 export type PolicyLifecycleStore = {
@@ -25,7 +26,7 @@ export class InMemoryPolicyLifecycleStore implements PolicyLifecycleStore {
   private readonly records = new Map<string, PolicyLifecycleRecord>();
   private activePolicyHash: string | null = null;
 
-  constructor(private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly now: () => Date = () => now()) {}
 
   getStatus(hash: string): PolicyLifecycleRecord | null {
     return this.records.get(hash) ?? null;
@@ -132,7 +133,7 @@ export class InMemoryPolicyLifecycleStore implements PolicyLifecycleStore {
 
 export function createPolicyLifecycleStore(): PolicyLifecycleStore {
   if (config.useInMemoryStore) {
-    return new InMemoryPolicyLifecycleStore();
+    return new InMemoryPolicyLifecycleStore(() => now());
   }
-  return new InMemoryPolicyLifecycleStore();
+  return new InMemoryPolicyLifecycleStore(() => now());
 }

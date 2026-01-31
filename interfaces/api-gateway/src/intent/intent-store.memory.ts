@@ -1,16 +1,16 @@
-import { randomUUID } from "node:crypto";
 import { Intent } from "./intent-model";
 import { IntentStore, StoredIntent } from "./intent-store";
+import { generateId, now } from "../testing/determinism";
 
 export class InMemoryIntentStore implements IntentStore {
   private readonly intents = new Map<string, StoredIntent>();
 
   async saveIntent(intent: Intent, traceId: string): Promise<StoredIntent> {
     const stored: StoredIntent = {
-      id: randomUUID(),
+      id: generateId(),
       traceId,
       intent,
-      createdAt: new Date()
+      createdAt: now()
     };
     this.intents.set(traceId, stored);
     return stored;

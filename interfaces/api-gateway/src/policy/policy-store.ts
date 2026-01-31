@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { config } from "../config";
 import type { PolicyDecisionResult, PolicyReason, RiskAssessment } from "../policy-code/types";
+import { generateId, now } from "../testing/determinism";
 
 export type PolicyDecisionRecord = {
   id: string;
@@ -25,7 +26,7 @@ class InMemoryPolicyStore implements PolicyStore {
 
   async savePolicyDecision(traceId: string, decision: PolicyDecisionResult): Promise<PolicyDecisionRecord> {
     const record: PolicyDecisionRecord = {
-      id: randomUUID(),
+      id: generateId(),
       traceId,
       policyHash: decision.policy.hash,
       decision: decision.final,
@@ -33,7 +34,7 @@ class InMemoryPolicyStore implements PolicyStore {
       reasons: decision.reasons,
       categories: decision.categories,
       risk: decision.risk,
-      createdAt: new Date()
+      createdAt: now()
     };
     this.decisions.set(traceId, record);
     return record;

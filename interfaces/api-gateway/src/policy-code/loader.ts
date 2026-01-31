@@ -4,6 +4,7 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { policyDocumentSchema } from "./schema";
 import type { PolicyDocument, PolicyInfo } from "./types";
+import { isDeterministic, now } from "../testing/determinism";
 
 export type PolicySnapshot = {
   policy: PolicyDocument | null;
@@ -57,11 +58,14 @@ function resolvePolicyPath(): string {
 }
 
 function buildInfo(pathValue: string, hash: string, version: string, loadedAt: Date): PolicyInfo {
+  const normalizedPath = isDeterministic()
+    ? path.relative(POLICY_ROOT, pathValue).replace(/\\/g, "/")
+    : pathValue;
   return {
     version,
     hash,
     loadedAt: loadedAt.toISOString(),
-    path: pathValue
+    path: normalizedPath
   };
 }
 
@@ -90,7 +94,7 @@ function loadPolicyFromDisk(): PolicySnapshot {
   const hash = hashPolicy(raw);
   return {
     policy,
-    info: buildInfo(policyPath, hash, policy.version, new Date()),
+    info: buildInfo(policyPath, hash, policy.version, now()),
     source: "loaded"
   };
 }
@@ -111,7 +115,7 @@ export function createPolicyLoader(options?: { handleSignals?: boolean }): Polic
         return lastGood;
       }
       const policyPath = resolvePolicyPath();
-      const fallbackInfo = buildInfo(policyPath, "unavailable", "v1", new Date());
+      const fallbackInfo = buildInfo(policyPath, "unavailable", "v1", now());
       const fallback: PolicySnapshot = {
         policy: null,
         info: fallbackInfo,
@@ -154,7 +158,7 @@ export function loadPolicyFromSource(request: CandidatePolicyRequest, options?: 
 }): CandidatePolicySnapshot {
   const loader = options?.loader ?? policyLoader;
   const inlineEnabled = options?.inlineEnabled ?? process.env.POLICY_INLINE_ENABLED === "true";
-  const loadedAt = new Date();
+  const loadedAt = now();
 
   if (request.source === "current") {
     const snapshot = loader.getSnapshot();

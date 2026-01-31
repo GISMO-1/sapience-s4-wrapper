@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import type {
   ReplayBaselineIntent,
@@ -10,6 +9,13 @@ import type {
   ReplayTotals
 } from "./types";
 import { PostgresPolicyReplayStore } from "./replay-store.pg";
+import { generateId, now } from "../testing/determinism";
+
+let overrideBaselineIntents: ReplayBaselineIntent[] | null = null;
+
+export function setPolicyReplayBaselineIntents(intents: ReplayBaselineIntent[] | null): void {
+  overrideBaselineIntents = intents ? intents.slice() : null;
+}
 
 export interface PolicyReplayStore {
   listBaselineIntents(filters: ReplayFilters): Promise<ReplayBaselineIntent[]>;
@@ -90,7 +96,7 @@ export class InMemoryPolicyReplayStore implements PolicyReplayStore {
 
   async createRun(input: ReplayRunInput): Promise<ReplayRunRecord> {
     const record: ReplayRunRecord = {
-      id: randomUUID(),
+      id: generateId(),
       requestedBy: input.requestedBy ?? null,
       baselinePolicyHash: input.baselinePolicyHash,
       candidatePolicyHash: input.candidatePolicyHash,
@@ -100,7 +106,7 @@ export class InMemoryPolicyReplayStore implements PolicyReplayStore {
       since: input.since ?? null,
       until: input.until ?? null,
       limit: input.limit,
-      createdAt: new Date()
+      createdAt: now()
     };
     this.runs.set(record.id, record);
     return record;
@@ -209,7 +215,7 @@ class FallbackPolicyReplayStore implements PolicyReplayStore {
 
 export function createPolicyReplayStore(): PolicyReplayStore {
   if (config.useInMemoryStore) {
-    return new InMemoryPolicyReplayStore();
+    return new InMemoryPolicyReplayStore({ baselineIntents: overrideBaselineIntents ?? undefined });
   }
   const memoryStore = new InMemoryPolicyReplayStore();
   return new FallbackPolicyReplayStore(new PostgresPolicyReplayStore(), memoryStore);

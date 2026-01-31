@@ -44,6 +44,7 @@ import { createPolicyRollbackStore } from "./policy-rollback/store";
 import { computeRollbackDecision } from "./policy-rollback/compute";
 import { buildReconcileReport, resolvePolicyDocumentByHash, resolvePolicyHashesForWindow } from "./policy-rollback/reconcile";
 import { logger } from "./logger";
+import { now } from "./testing/determinism";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -366,7 +367,8 @@ async function evaluateGuardrailsForCandidate(policyHash: string, candidatePolic
     replayStore,
     lineageStore,
     config: config.promotionGuardrails,
-    executionMode
+    executionMode,
+    now: now()
   });
 }
 
@@ -889,8 +891,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get("/v1/policy/drift", async (request) => {
     const traceId = getTraceIdFromRequest(request);
     const query = policyDriftQuerySchema.parse(request.query ?? {});
-    const now = new Date();
-    const defaults = defaultDriftWindow(now);
+    const currentTime = now();
+    const defaults = defaultDriftWindow(currentTime);
     const recentSince = query.since ? new Date(query.since) : defaults.recent.since;
     const recentUntil = query.until ? new Date(query.until) : defaults.recent.until;
     const baselineUntil = query.baselineUntil ? new Date(query.baselineUntil) : recentSince;
@@ -944,7 +946,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       baselineUntil: parsed.data.baselineUntil ? new Date(parsed.data.baselineUntil) : undefined,
       qualitySince: parsed.data.qualitySince ? new Date(parsed.data.qualitySince) : undefined,
       qualityUntil: parsed.data.qualityUntil ? new Date(parsed.data.qualityUntil) : undefined,
-      activePolicyHash: activeSnapshot.info.hash
+      activePolicyHash: activeSnapshot.info.hash,
+      now: now()
     });
     return { traceId, policyHash: parsed.data.policyHash, ...result };
   });
@@ -1226,11 +1229,11 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Replay run not found", traceId };
     }
     const results = await replayStore.getResults(runId, { limit: run.limit, offset: 0 });
-    const now = new Date();
+    const currentTime = now();
     const since = outcomeQuery.outcomesSince
       ? new Date(outcomeQuery.outcomesSince)
-      : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const until = outcomeQuery.outcomesUntil ? new Date(outcomeQuery.outcomesUntil) : now;
+      : new Date(currentTime.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const until = outcomeQuery.outcomesUntil ? new Date(outcomeQuery.outcomesUntil) : currentTime;
     const outcomes = await outcomeStore.listOutcomes({
       policyHash: run.candidatePolicyHash,
       since,
@@ -1349,7 +1352,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       lineageStore,
       lifecycleStore,
       rollbackStore,
-      evaluator: policyEvaluator
+      evaluator: policyEvaluator,
+      now: now()
     });
 
     if (!decision.ok) {
@@ -1490,7 +1494,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
     const body = parsed.data;
     const isLegacy = "runId" in body;
-    const now = new Date();
+    const currentTime = now();
     const force = Boolean(body.force);
 
     let policyHash: string;
@@ -1605,7 +1609,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
     const approval = {
       approvedBy: reviewer,
-      approvedAt: now.toISOString(),
+      approvedAt: currentTime.toISOString(),
       reason: rationale ?? "Manual promotion.",
       rationale,
       acceptedRiskScore: acceptedRisk,

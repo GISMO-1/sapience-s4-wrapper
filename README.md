@@ -129,6 +129,7 @@ Policy replay now includes an executive-ready impact report plus a minimal sandb
 - `GET /v1/policy/replay/:runId/report` to fetch totals, deltas, and top changes.
 - `POST /v1/policy/promote` to approve and activate a simulated policy.
 - `GET /v1/policy/status` to inspect policy lifecycle status and approvals.
+- `GET /v1/policy/timeline?policyHash=...` to view the derived lifecycle state and ordered audit trail.
 - `GET /v1/policy/current` to inspect the loaded policy snapshot.
 - `GET /v1/policy/lineage/current` to view the active policy lineage chain.
 - `GET /v1/policy/lineage/:policyHash` to view lineage for a specific policy hash.
@@ -140,6 +141,12 @@ Outcome feedback loop endpoints capture real-world results and compute outcome-w
 
 ## Why lineage matters
 Policy lineage provides a clear audit trail for how guardrails evolve. By capturing parent relationships, rationale, accepted risk scores, and drift summaries on every promotion, teams can explain why a policy changed and quantify the blast radius before it reaches production.
+
+## Policy lifecycle model
+The policy lifecycle is derived from stored facts instead of mutable flags. The timeline endpoint assembles simulations, guardrail checks, approvals, and promotions into an ordered audit trail, then derives the current state:
+- DRAFT → SIMULATED → GUARDED → APPROVED → ACTIVE → SUPERSEDED
+- ACTIVE is determined by the current policy pointer.
+- SUPERSEDED is determined when the active lineage chain includes the policy but the policy is no longer active.
 
 ## Event flow (short)
 1. Domain services publish intent events (ex: `sapience.procurement.po.requested`).

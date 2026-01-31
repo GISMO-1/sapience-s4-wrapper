@@ -30,7 +30,10 @@ import type { IntentApprovalRecord } from "./intent-approvals/types";
 import { computePolicyImpactReport } from "./policy-impact/compute";
 import { evaluatePromotionGuardrails } from "./policy-promotion-guardrails/compute";
 import type { GuardrailDecision } from "./policy-promotion-guardrails/types";
+import { createPolicyGuardrailCheckStore } from "./policy-promotion-guardrails/store";
 import { createPolicyPromotionStore } from "./policy-promotions/store";
+import { createPolicyApprovalStore } from "./policy-approvals/store";
+import { buildPolicyLifecycleTimeline } from "./policy-lifecycle/timeline";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -43,6 +46,8 @@ const lineageStore = createPolicyLineageStore();
 const outcomeStore = createPolicyOutcomeStore();
 const approvalStore = createIntentApprovalStore();
 const promotionStore = createPolicyPromotionStore();
+const guardrailCheckStore = createPolicyGuardrailCheckStore();
+const policyApprovalStore = createPolicyApprovalStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -129,6 +134,10 @@ const guardrailPromoteRequestSchema = z.object({
 const promoteRequestSchema = z.union([legacyPromoteRequestSchema, guardrailPromoteRequestSchema]);
 
 const promotionCheckQuerySchema = z.object({
+  policyHash: z.string().min(1)
+});
+
+const policyTimelineQuerySchema = z.object({
   policyHash: z.string().min(1)
 });
 
@@ -997,6 +1006,35 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.get("/v1/policy/timeline", async (request, reply) => {
+    const parsed = policyTimelineQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid policy timeline request" };
+    }
+    const { policyHash } = parsed.data;
+    const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const activePolicyHash = activeSnapshot.info.hash;
+
+    const [lineage, activeLineageChain, simulations, guardrailChecks, approvals] = await Promise.all([
+      lineageStore.getLineage(policyHash),
+      lineageStore.getLineageChain(activePolicyHash),
+      replayStore.listRuns({ policyHash, limit: 200 }),
+      guardrailCheckStore.listChecks(policyHash),
+      policyApprovalStore.listApprovals(policyHash)
+    ]);
+
+    return buildPolicyLifecycleTimeline({
+      policyHash,
+      activePolicyHash,
+      lineage,
+      activeLineageChain,
+      simulations,
+      guardrailChecks,
+      approvals
+    });
+  });
+
   app.get("/v1/policy/lineage/current", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
     const active = lifecycleStore.getActivePolicy() ?? policyEvaluator.getPolicySnapshot();
@@ -1056,6 +1094,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (!config.promotionGuardrails.enabled) {
       decision = { ...decision, allowed: true, requiredAcceptance: false, reasons: [] };
     }
+
+    await guardrailCheckStore.recordCheck({
+      policyHash,
+      evaluatedAt: decision.snapshot.evaluatedAt,
+      actor: "system",
+      rationale: "Promotion guardrail check executed.",
+      decision
+    });
 
     return { traceId, ...decision };
   });
@@ -1192,6 +1238,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       runId
     };
 
+    await policyApprovalStore.recordApproval({
+      policyHash,
+      approvedBy: approval.approvedBy,
+      approvedAt: approval.approvedAt,
+      rationale: approval.reason,
+      acceptedRiskScore: approval.acceptedRiskScore,
+      notes: approval.notes,
+      runId: approval.runId
+    });
+
     const parentPolicyHash = policyEvaluator.getPolicySnapshot().info.hash;
     const drift =
       driftResults.length > 0
@@ -1216,6 +1272,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (decision) {
+      await guardrailCheckStore.recordCheck({
+        policyHash,
+        evaluatedAt: decision.snapshot.evaluatedAt,
+        actor: reviewer,
+        rationale: rationale ?? "Guardrail check recorded during promotion.",
+        decision
+      });
       await promotionStore.createPromotion({
         policyHash,
         evaluatedAt: decision.snapshot.evaluatedAt,

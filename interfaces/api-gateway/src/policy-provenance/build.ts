@@ -17,6 +17,8 @@ import type { PolicyApprovalRecord } from "../policy-approvals/types";
 import { verifyPolicyDeterminism } from "../policy-verifier/verify";
 import type { PolicyImpactReport } from "../policy-impact/types";
 import type { PolicyLifecycleTimeline } from "../policy-lifecycle/timeline";
+import type { CounterfactualRequest } from "../policy-counterfactual/types";
+import { buildPolicyCounterfactualReport } from "../policy-counterfactual/compute";
 import type { PolicyProvenanceReport, PolicyImpactSimulationSummary, PolicyProvenanceMetadata } from "./types";
 
 const RATE_DECIMALS = 4;
@@ -32,6 +34,7 @@ type BuildInput = {
   outcomeStore: PolicyOutcomeStore;
   rollbackStore: PolicyRollbackStore;
   policyInfo?: PolicyInfo;
+  counterfactual?: CounterfactualRequest;
 };
 
 function roundNumber(value: number | null | undefined): number | null {
@@ -334,7 +337,19 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
     })
   );
 
-  const reportBase = {
+  const counterfactualReportHash = input.counterfactual
+    ? (
+        await buildPolicyCounterfactualReport({
+          ...input.counterfactual,
+          outcomeStore: input.outcomeStore,
+          replayStore: input.replayStore,
+          lifecycleStore: input.lifecycleStore,
+          lineageStore: input.lineageStore
+        })
+      ).reportHash
+    : undefined;
+
+  const reportBase: Omit<PolicyProvenanceReport, "reportHash"> = {
     policyHash: input.policyHash,
     asOf,
     metadata: buildMetadata({
@@ -350,7 +365,11 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
     driftReport,
     impactSimulationSummary: buildImpactSummary(guardrailChecks),
     determinism
-  } satisfies Omit<PolicyProvenanceReport, "reportHash">;
+  };
+
+  if (counterfactualReportHash) {
+    reportBase.counterfactualReportHash = counterfactualReportHash;
+  }
 
   const reportHash = sha256(canonicalJson(reportBase));
 
@@ -369,6 +388,9 @@ export function buildPolicyProvenanceMarkdown(report: PolicyProvenanceReport): s
   lines.push(`- As Of: ${report.asOf}`);
   lines.push(`- Lifecycle State: ${report.lifecycle.state}`);
   lines.push(`- Determinism Verified: ${report.determinism.verified ? "Yes" : "No"}`);
+  if (report.counterfactualReportHash) {
+    lines.push(`- Counterfactual Report Hash: ${report.counterfactualReportHash}`);
+  }
   lines.push("");
   lines.push("## Metadata");
   lines.push("");

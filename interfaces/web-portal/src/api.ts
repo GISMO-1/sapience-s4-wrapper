@@ -170,6 +170,40 @@ export type PolicyImpactSimulationReport = {
   }>;
 };
 
+export type CounterfactualRequest = {
+  policyHash: string;
+  compareToPolicyHash?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+};
+
+export type CounterfactualOutcomeDelta = {
+  outcomeType: string;
+  beforeCount: number;
+  afterCount: number;
+  delta: number;
+  severityShift?: {
+    beforeAvg: number;
+    afterAvg: number;
+    delta: number;
+  };
+};
+
+export type BlastRadiusReport = {
+  traceId: string;
+  policyHash: string;
+  baselinePolicyHash: string;
+  window: { since: string; until: string };
+  intentsAffected: number;
+  tracesAffected: number;
+  outcomes: CounterfactualOutcomeDelta[];
+  approvalRateDelta?: number;
+  rejectionRateDelta?: number;
+  riskScoreDelta?: number;
+  reportHash: string;
+};
+
 export type ReplayReport = {
   traceId: string;
   run: {
@@ -255,6 +289,33 @@ export async function fetchPolicyImpactReport(payload: {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
   });
+}
+
+export async function computeCounterfactual(payload: CounterfactualRequest): Promise<BlastRadiusReport> {
+  return fetchJson(buildUrl("/v1/policy/counterfactual"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchBlastRadius(payload: {
+  policyHash: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}): Promise<BlastRadiusReport> {
+  const params = new URLSearchParams({ policyHash: payload.policyHash });
+  if (payload.since) {
+    params.set("since", payload.since);
+  }
+  if (payload.until) {
+    params.set("until", payload.until);
+  }
+  if (payload.limit) {
+    params.set("limit", String(payload.limit));
+  }
+  return fetchJson(buildUrl(`/v1/policy/blast-radius?${params.toString()}`));
 }
 
 export async function promotePolicy(payload: {

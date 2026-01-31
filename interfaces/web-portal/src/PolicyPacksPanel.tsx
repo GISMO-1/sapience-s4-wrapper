@@ -136,6 +136,9 @@ export function PolicyPacksPanel() {
                   <a className="policy-packs-link" href="#policy-sandbox">
                     Go to promotion flow
                   </a>
+                  <a className="policy-packs-link" href="#policy-counterfactual">
+                    View blast radius before install
+                  </a>
                 </div>
               </div>
             ) : (

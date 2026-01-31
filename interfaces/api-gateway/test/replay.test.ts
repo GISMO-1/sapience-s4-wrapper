@@ -50,6 +50,7 @@ function baselineIntent(overrides?: Partial<ReplayBaselineIntent>): ReplayBaseli
     baselineDecision: "ALLOW",
     baselineMatchedRules: [],
     baselinePolicyHash: "baseline-hash",
+    baselineRisk: { level: "low", signals: [] },
     ...overrides
   };
 }

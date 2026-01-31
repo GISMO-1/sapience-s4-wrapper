@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchReplayReport,
   fetchTraceExplain,
+  fetchPolicyLineageCurrent,
   promotePolicy,
   runPolicyReplay,
+  type PolicyLineageResponse,
   type ReplayCandidateSource,
   type ReplayReport
 } from "./api";
@@ -21,11 +23,27 @@ export function PolicySandbox() {
   const [traceExplain, setTraceExplain] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [approver, setApprover] = useState("");
-  const [approvalReason, setApprovalReason] = useState("");
+  const [approvalRationale, setApprovalRationale] = useState("");
+  const [acceptedRiskScore, setAcceptedRiskScore] = useState("");
   const [approvalNotes, setApprovalNotes] = useState("");
   const [promotionStatus, setPromotionStatus] = useState<string>("");
   const [promotionError, setPromotionError] = useState<string>("");
   const [promotionLoading, setPromotionLoading] = useState(false);
+  const [lineage, setLineage] = useState<PolicyLineageResponse | null>(null);
+  const [lineageError, setLineageError] = useState<string>("");
+
+  useEffect(() => {
+    const loadLineage = async () => {
+      setLineageError("");
+      try {
+        const response = await fetchPolicyLineageCurrent();
+        setLineage(response);
+      } catch (err) {
+        setLineageError((err as Error).message);
+      }
+    };
+    loadLineage();
+  }, []);
 
   const buildFilters = () => {
     const parsedLimit = Number(limit);
@@ -83,10 +101,18 @@ export function PolicySandbox() {
       await promotePolicy({
         runId: report.run.runId,
         approvedBy: approver.trim(),
-        reason: approvalReason.trim(),
+        rationale: approvalRationale.trim(),
+        acceptedRiskScore: Number(acceptedRiskScore),
+        reason: approvalRationale.trim(),
         notes: approvalNotes.trim() || undefined
       });
       setPromotionStatus("Policy promoted successfully.");
+      try {
+        const response = await fetchPolicyLineageCurrent();
+        setLineage(response);
+      } catch (err) {
+        setLineageError((err as Error).message);
+      }
     } catch (err) {
       setPromotionError((err as Error).message);
     } finally {
@@ -188,6 +214,51 @@ export function PolicySandbox() {
         </div>
       </div>
 
+      <div className="sandbox-card">
+        <h3>Current policy lineage</h3>
+        {lineageError && <span className="sandbox-error">{lineageError}</span>}
+        {!lineage && !lineageError && <span>Loading lineage...</span>}
+        {lineage && (
+          <>
+            <div className="sandbox-row">
+              <strong>Active policy hash:</strong> <span>{lineage.policyHash}</span>
+            </div>
+            <table className="sandbox-table">
+              <thead>
+                <tr>
+                  <th>Policy hash</th>
+                  <th>Parent</th>
+                  <th>Promoted by</th>
+                  <th>Promoted at</th>
+                  <th>Rationale</th>
+                  <th>Accepted risk</th>
+                  <th>Drift (added/removed)</th>
+                  <th>Severity Δ</th>
+                  <th>Risk score Δ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineage.lineage.map((entry) => (
+                  <tr key={entry.policyHash}>
+                    <td>{entry.policyHash}</td>
+                    <td>{entry.parentPolicyHash ?? "root"}</td>
+                    <td>{entry.promotedBy}</td>
+                    <td>{new Date(entry.promotedAt).toLocaleString()}</td>
+                    <td>{entry.rationale}</td>
+                    <td>{entry.acceptedRiskScore}</td>
+                    <td>
+                      +{entry.drift.constraintsAdded}/-{entry.drift.constraintsRemoved}
+                    </td>
+                    <td>{entry.drift.severityDelta}</td>
+                    <td>{entry.drift.netRiskScoreChange}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+
       {report && (
         <div className="sandbox-report">
           <h3>Replay report</h3>
@@ -235,12 +306,22 @@ export function PolicySandbox() {
                 />
               </label>
               <label>
-                Reason
+                Rationale
                 <input
                   type="text"
-                  value={approvalReason}
-                  onChange={(event) => setApprovalReason(event.target.value)}
-                  placeholder="e.g. regression safe"
+                  value={approvalRationale}
+                  onChange={(event) => setApprovalRationale(event.target.value)}
+                  placeholder="Explain why the promotion is acceptable"
+                />
+              </label>
+              <label>
+                Accepted risk score
+                <input
+                  type="number"
+                  min={0}
+                  value={acceptedRiskScore}
+                  onChange={(event) => setAcceptedRiskScore(event.target.value)}
+                  placeholder="e.g. 12"
                 />
               </label>
             </div>
@@ -263,7 +344,9 @@ export function PolicySandbox() {
                   promotionLoading ||
                   report.impact.blocked ||
                   !approver.trim() ||
-                  !approvalReason.trim()
+                  approvalRationale.trim().length < 10 ||
+                  !acceptedRiskScore.trim() ||
+                  !Number.isFinite(Number(acceptedRiskScore))
                 }
               >
                 {promotionLoading ? "Promoting..." : "Promote policy"}

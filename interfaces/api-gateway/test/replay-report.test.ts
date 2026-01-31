@@ -53,6 +53,7 @@ function buildResult(partial: Partial<ReplayResultRecord>): ReplayResultRecord {
     baselineMatchedRules: partial.baselineMatchedRules ?? [],
     candidateMatchedRules: partial.candidateMatchedRules ?? [],
     candidateConstraintTypes: partial.candidateConstraintTypes ?? [],
+    baselineRisk: partial.baselineRisk ?? { level: "low", signals: [] },
     reasons: partial.reasons ?? [],
     categories: partial.categories ?? [],
     risk: partial.risk ?? { level: "low", signals: [] },

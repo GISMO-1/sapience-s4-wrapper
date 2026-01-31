@@ -15,6 +15,7 @@ const baseResult: ReplayResultRecord = {
   baselineMatchedRules: [],
   candidateMatchedRules: [],
   candidateConstraintTypes: [],
+  baselineRisk: { level: "low", signals: [] },
   reasons: [],
   categories: [],
   risk: { level: "low", signals: [] },

@@ -132,6 +132,22 @@ POLICY_INLINE_ENABLED=true curl -s -X POST http://localhost:3000/v1/policy/repla
   -d '{"candidatePolicy":{"source":"inline","yaml":"version: \"v1\"\\ndefaults:\\n  confidenceThreshold: 0.7\\n  execution:\\n    autoRequires: [\"WARN\"]\\nrules: []\\n"}}' | jq
 ```
 
+## Policy lineage & promotion rationale
+
+Policy promotions now require a promotion rationale (minimum 10 characters) and an accepted risk score. Each promotion records a lineage entry linking the new policy hash to its parent, including a drift summary (constraints added/removed, severity delta, and net risk score change).
+
+Example: promote with rationale metadata:
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/promote \\
+  -H 'content-type: application/json' \\
+  -d '{\"runId\":\"RUN_ID\",\"approvedBy\":\"Reviewer\",\"rationale\":\"Regression results match baseline.\",\"acceptedRiskScore\":12}' | jq
+```
+
+Example: fetch the current lineage chain:
+```bash
+curl -s http://localhost:3000/v1/policy/lineage/current | jq
+```
+
 ## Safe fallback
 
 If policy loading fails and no cached policy exists, the gateway uses a safe fallback:

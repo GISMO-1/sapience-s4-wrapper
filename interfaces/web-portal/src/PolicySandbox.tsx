@@ -14,6 +14,8 @@ import {
   executeIntent,
   fetchPromotionCheck,
   promotePolicy,
+  rollbackPolicy,
+  reconcilePolicy,
   runPolicyReplay,
   type PolicyOutcomeType,
   type PolicyQualityResponse,
@@ -25,7 +27,10 @@ import {
   type PromotionGuardrailDecision,
   type IntentDecisionResponse,
   type ReplayCandidateSource,
-  type ReplayReport
+  type ReplayReport,
+  type RollbackDecision,
+  type RollbackEvent,
+  type ReconcileReport
 } from "./api";
 
 const DEFAULT_INLINE = "version: \"v1\"\n";
@@ -109,6 +114,25 @@ export function PolicySandbox() {
   const [guardrailPromotionStatus, setGuardrailPromotionStatus] = useState("");
   const [guardrailPromotionError, setGuardrailPromotionError] = useState("");
   const [guardrailPromotionLoading, setGuardrailPromotionLoading] = useState(false);
+  const [rollbackTargetHash, setRollbackTargetHash] = useState("");
+  const [rollbackActor, setRollbackActor] = useState("local-user");
+  const [rollbackRationale, setRollbackRationale] = useState("");
+  const [rollbackDecision, setRollbackDecision] = useState<RollbackDecision | null>(null);
+  const [rollbackEvent, setRollbackEvent] = useState<RollbackEvent | null>(null);
+  const [rollbackStatus, setRollbackStatus] = useState("");
+  const [rollbackError, setRollbackError] = useState("");
+  const [rollbackLoading, setRollbackLoading] = useState(false);
+  const [reconcileFromHash, setReconcileFromHash] = useState("");
+  const [reconcileToHash, setReconcileToHash] = useState("");
+  const [reconcileSince, setReconcileSince] = useState(() => {
+    const date = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return date.toISOString().slice(0, 16);
+  });
+  const [reconcileUntil, setReconcileUntil] = useState(() => new Date().toISOString().slice(0, 16));
+  const [reconcileUseWindow, setReconcileUseWindow] = useState(false);
+  const [reconcileReport, setReconcileReport] = useState<ReconcileReport | null>(null);
+  const [reconcileError, setReconcileError] = useState("");
+  const [reconcileLoading, setReconcileLoading] = useState(false);
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -128,6 +152,19 @@ export function PolicySandbox() {
       setVerificationPolicyHash(lineage.policyHash);
     }
   }, [lineage?.policyHash, verificationPolicyHash]);
+
+  useEffect(() => {
+    const rollbackCandidates = lineage?.lineage.filter((record) => record.policyHash !== lineage.policyHash) ?? [];
+    if (!rollbackTargetHash && rollbackCandidates.length) {
+      setRollbackTargetHash(rollbackCandidates[0].policyHash);
+    }
+    if (!reconcileFromHash && lineage?.policyHash) {
+      setReconcileFromHash(lineage.policyHash);
+    }
+    if (!reconcileToHash && rollbackCandidates.length) {
+      setReconcileToHash(rollbackCandidates[0].policyHash);
+    }
+  }, [lineage, rollbackTargetHash, reconcileFromHash, reconcileToHash]);
 
   useEffect(() => {
     if (!lineage?.policyHash) {
@@ -342,6 +379,78 @@ export function PolicySandbox() {
       setGuardrailPromotionError((err as Error).message);
     } finally {
       setGuardrailPromotionLoading(false);
+    }
+  };
+
+  const handleRollback = async (dryRun: boolean) => {
+    if (!rollbackTargetHash.trim()) {
+      return;
+    }
+    setRollbackLoading(true);
+    setRollbackError("");
+    setRollbackStatus("");
+    setRollbackDecision(null);
+    setRollbackEvent(null);
+    try {
+      const response = await rollbackPolicy({
+        targetPolicyHash: rollbackTargetHash.trim(),
+        actor: rollbackActor.trim(),
+        rationale: rollbackRationale.trim(),
+        dryRun
+      });
+      const data = response.data;
+      if (data && typeof data === "object" && "decision" in data) {
+        setRollbackDecision(data.decision as RollbackDecision);
+        const event = "event" in data ? (data.event as RollbackEvent | null | undefined) : null;
+        setRollbackEvent(event ?? null);
+      }
+      if (response.ok) {
+        setRollbackStatus(dryRun ? "Dry run completed." : "Rollback executed.");
+        if (!dryRun) {
+          const updated = await fetchPolicyLineageCurrent();
+          setLineage(updated);
+        }
+      } else {
+        setRollbackError(
+          typeof data === "object" && data && "message" in data ? String(data.message) : "Rollback failed."
+        );
+      }
+    } catch (err) {
+      setRollbackError((err as Error).message);
+    } finally {
+      setRollbackLoading(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    setReconcileLoading(true);
+    setReconcileError("");
+    setReconcileReport(null);
+    try {
+      if (reconcileUseWindow) {
+        const since = new Date(reconcileSince);
+        const until = new Date(reconcileUntil);
+        if (!Number.isFinite(since.getTime()) || !Number.isFinite(until.getTime())) {
+          throw new Error("Both since and until timestamps are required.");
+        }
+        const response = await reconcilePolicy({
+          since: since.toISOString(),
+          until: until.toISOString()
+        });
+        setReconcileReport(response.report);
+      } else {
+        const fromPolicyHash = reconcileFromHash.trim();
+        const toPolicyHash = reconcileToHash.trim();
+        if (!fromPolicyHash || !toPolicyHash) {
+          throw new Error("From/to policy hashes are required.");
+        }
+        const response = await reconcilePolicy({ fromPolicyHash, toPolicyHash });
+        setReconcileReport(response.report);
+      }
+    } catch (err) {
+      setReconcileError((err as Error).message);
+    } finally {
+      setReconcileLoading(false);
     }
   };
 
@@ -568,10 +677,15 @@ export function PolicySandbox() {
         return "Approval";
       case "promotion":
         return "Promotion";
+      case "rollback":
+        return "Rollback";
       default:
         return type;
     }
   };
+
+  const rollbackCandidates = lineage?.lineage.filter((record) => record.policyHash !== lineage.policyHash) ?? [];
+  const rollbackReady = Boolean(rollbackTargetHash.trim() && rollbackActor.trim() && rollbackRationale.trim());
 
   return (
     <section className="policy-sandbox" id="policy-sandbox">
@@ -934,6 +1048,267 @@ export function PolicySandbox() {
               </ul>
             )}
           </>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy Rollback</h3>
+        <p>Roll back to a previously promoted policy hash with deterministic guardrails.</p>
+        <div className="sandbox-row">
+          <label>
+            Target policy hash
+            <select
+              value={rollbackTargetHash}
+              onChange={(event) => setRollbackTargetHash(event.target.value)}
+              disabled={!rollbackCandidates.length}
+            >
+              {rollbackCandidates.length === 0 && <option value="">No promoted policies available</option>}
+              {rollbackCandidates.map((record) => (
+                <option key={record.policyHash} value={record.policyHash}>
+                  {record.policyHash} (promoted {new Date(record.promotedAt).toLocaleString()})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Actor
+            <input
+              type="text"
+              value={rollbackActor}
+              onChange={(event) => setRollbackActor(event.target.value)}
+              placeholder="Rollback operator"
+            />
+          </label>
+          <label>
+            Rationale
+            <input
+              type="text"
+              value={rollbackRationale}
+              onChange={(event) => setRollbackRationale(event.target.value)}
+              placeholder="Explain the rollback"
+            />
+          </label>
+        </div>
+        <div className="sandbox-actions">
+          <button type="button" onClick={() => handleRollback(true)} disabled={!rollbackReady || rollbackLoading}>
+            {rollbackLoading ? "Running..." : "Dry Run Rollback"}
+          </button>
+          <button type="button" onClick={() => handleRollback(false)} disabled={!rollbackReady || rollbackLoading}>
+            {rollbackLoading ? "Rolling back..." : "Rollback"}
+          </button>
+          {rollbackStatus && <span className="sandbox-success">{rollbackStatus}</span>}
+          {rollbackError && <span className="sandbox-error">{rollbackError}</span>}
+        </div>
+        {rollbackDecision && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Status</strong>
+                <div className={rollbackDecision.ok ? "impact-badge impact-badge-low" : "impact-badge impact-badge-high"}>
+                  {rollbackDecision.ok ? "Approved" : "Rejected"}
+                </div>
+              </div>
+              <div>
+                <strong>Decision hash</strong>
+                <div>{rollbackDecision.decisionHash}</div>
+              </div>
+              <div>
+                <strong>From → To</strong>
+                <div>
+                  {rollbackDecision.fromPolicyHash} → {rollbackDecision.toPolicyHash}
+                </div>
+              </div>
+              <div>
+                <strong>Created</strong>
+                <div>{new Date(rollbackDecision.createdAt).toLocaleString()}</div>
+              </div>
+            </div>
+            {rollbackDecision.reasons.length > 0 && (
+              <div>
+                <strong>Reasons</strong>
+                <ul>
+                  {rollbackDecision.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {rollbackEvent && (
+              <div>
+                <strong>Rollback event</strong>
+                <div>Event hash: {rollbackEvent.eventHash}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Policy Reconciliation</h3>
+        <p>Compare two policy hashes or a time window with semantic diffs.</p>
+        <div className="sandbox-row">
+          <label>
+            From policy hash
+            <input
+              type="text"
+              value={reconcileFromHash}
+              onChange={(event) => setReconcileFromHash(event.target.value)}
+              disabled={reconcileUseWindow}
+              placeholder="From policy hash"
+            />
+          </label>
+          <label>
+            To policy hash
+            <input
+              type="text"
+              value={reconcileToHash}
+              onChange={(event) => setReconcileToHash(event.target.value)}
+              disabled={reconcileUseWindow}
+              placeholder="To policy hash"
+            />
+          </label>
+        </div>
+        <div className="sandbox-row">
+          <label>
+            <input
+              type="checkbox"
+              checked={reconcileUseWindow}
+              onChange={(event) => setReconcileUseWindow(event.target.checked)}
+            />
+            Use time window instead of hashes
+          </label>
+        </div>
+        {reconcileUseWindow && (
+          <div className="sandbox-row">
+            <label>
+              Since
+              <input
+                type="datetime-local"
+                value={reconcileSince}
+                onChange={(event) => setReconcileSince(event.target.value)}
+              />
+            </label>
+            <label>
+              Until
+              <input
+                type="datetime-local"
+                value={reconcileUntil}
+                onChange={(event) => setReconcileUntil(event.target.value)}
+              />
+            </label>
+          </div>
+        )}
+        <div className="sandbox-actions">
+          <button type="button" onClick={handleReconcile} disabled={reconcileLoading}>
+            {reconcileLoading ? "Reconciling..." : "Reconcile"}
+          </button>
+          {reconcileError && <span className="sandbox-error">{reconcileError}</span>}
+        </div>
+        {reconcileReport && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Rules added</strong>
+                <div className="impact-badge impact-badge-low">{reconcileReport.summary.rulesAdded}</div>
+              </div>
+              <div>
+                <strong>Rules removed</strong>
+                <div className="impact-badge impact-badge-high">{reconcileReport.summary.rulesRemoved}</div>
+              </div>
+              <div>
+                <strong>Rules modified</strong>
+                <div className="impact-badge impact-badge-medium">{reconcileReport.summary.rulesModified}</div>
+              </div>
+              <div>
+                <strong>Defaults changed</strong>
+                <div>{reconcileReport.summary.defaultsChanged ? "Yes" : "No"}</div>
+              </div>
+              <div>
+                <strong>Approvals added</strong>
+                <div>{reconcileReport.summary.approvalsAdded.join(", ") || "none"}</div>
+              </div>
+              <div>
+                <strong>Approvals removed</strong>
+                <div>{reconcileReport.summary.approvalsRemoved.join(", ") || "none"}</div>
+              </div>
+              <div>
+                <strong>Auto-exec approvals changed</strong>
+                <div>{reconcileReport.summary.autoExecutionApprovalsChanged ? "Yes" : "No"}</div>
+              </div>
+              <div>
+                <strong>Report hash</strong>
+                <div>{reconcileReport.reportHash}</div>
+              </div>
+            </div>
+            <details>
+              <summary>Rules added ({reconcileReport.rulesAdded.length})</summary>
+              {reconcileReport.rulesAdded.length === 0 ? (
+                <div>No rules added.</div>
+              ) : (
+                <ul>
+                  {reconcileReport.rulesAdded.map((rule) => (
+                    <li key={rule.ruleId}>
+                      {rule.ruleId} · approvals: {rule.approvalRoles.join(", ") || "none"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+            <details>
+              <summary>Rules removed ({reconcileReport.rulesRemoved.length})</summary>
+              {reconcileReport.rulesRemoved.length === 0 ? (
+                <div>No rules removed.</div>
+              ) : (
+                <ul>
+                  {reconcileReport.rulesRemoved.map((rule) => (
+                    <li key={rule.ruleId}>
+                      {rule.ruleId} · approvals: {rule.approvalRoles.join(", ") || "none"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+            <details>
+              <summary>Rules modified ({reconcileReport.rulesModified.length})</summary>
+              {reconcileReport.rulesModified.length === 0 ? (
+                <div>No rules modified.</div>
+              ) : (
+                <div className="sandbox-section">
+                  {reconcileReport.rulesModified.map((rule) => (
+                    <details key={rule.ruleId}>
+                      <summary>{rule.ruleId}</summary>
+                      <div className="sandbox-section">
+                        <div>
+                          <strong>Changes</strong>
+                          <ul>
+                            <li>Enabled changed: {rule.changes.enabledChanged ? "Yes" : "No"}</li>
+                            <li>Decision changed: {rule.changes.decisionChanged ? "Yes" : "No"}</li>
+                            <li>Priority Δ: {rule.changes.priorityDelta}</li>
+                            <li>Tags added: {rule.changes.tagsAdded.join(", ") || "none"}</li>
+                            <li>Tags removed: {rule.changes.tagsRemoved.join(", ") || "none"}</li>
+                            <li>Intent types added: {rule.changes.intentTypesAdded.join(", ") || "none"}</li>
+                            <li>Intent types removed: {rule.changes.intentTypesRemoved.join(", ") || "none"}</li>
+                            <li>Approvals added: {rule.changes.approvalsAdded.join(", ") || "none"}</li>
+                            <li>Approvals removed: {rule.changes.approvalsRemoved.join(", ") || "none"}</li>
+                            <li>Constraints added: {rule.changes.constraintsAdded.length}</li>
+                            <li>Constraints removed: {rule.changes.constraintsRemoved.length}</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>Before</strong>
+                          <pre className="sandbox-pre">{JSON.stringify(rule.before.rule, null, 2)}</pre>
+                        </div>
+                        <div>
+                          <strong>After</strong>
+                          <pre className="sandbox-pre">{JSON.stringify(rule.after.rule, null, 2)}</pre>
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </details>
+          </div>
         )}
       </div>
 

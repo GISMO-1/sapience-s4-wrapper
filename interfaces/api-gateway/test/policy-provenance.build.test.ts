@@ -5,6 +5,7 @@ import { InMemoryPolicyReplayStore } from "../src/policy-replay/replay-store";
 import { InMemoryGuardrailCheckStore } from "../src/policy-promotion-guardrails/store";
 import { InMemoryPolicyApprovalStore } from "../src/policy-approvals/store";
 import { InMemoryPolicyOutcomeStore } from "../src/policy-outcomes/store";
+import { InMemoryPolicyRollbackStore } from "../src/policy-rollback/store";
 import { buildPolicyProvenanceReport } from "../src/policy-provenance/build";
 import type { DriftReport } from "../src/policy-drift/types";
 import type { PolicyImpactReport } from "../src/policy-impact/types";
@@ -199,13 +200,16 @@ async function seedStores() {
     }
   });
 
+  const rollbackStore = new InMemoryPolicyRollbackStore();
+
   return {
     lifecycleStore,
     lineageStore,
     replayStore,
     guardrailCheckStore,
     approvalStore,
-    outcomeStore
+    outcomeStore,
+    rollbackStore
   };
 }
 
@@ -224,16 +228,47 @@ test("builds a deterministic provenance report with ordered sections", async () 
     replayStore: stores.replayStore,
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
-    outcomeStore: stores.outcomeStore
+    outcomeStore: stores.outcomeStore,
+    rollbackStore: stores.rollbackStore
   });
 
   expect(report.policyHash).toBe(policyHash);
   expect(report.lifecycle.events[0]?.type).toBe("simulation");
   expect(report.guardrailChecks).toHaveLength(1);
   expect(report.approvals[0]?.approvedBy).toBe("risk-team");
+  expect(report.lastRollback).toBeNull();
   expect(report.impactSimulationSummary?.blastRadiusScore).toBe(12.3457);
   expect(report.determinism.verified).toBe(true);
   expect(report.reportHash).toMatch(/^[a-f0-9]{64}$/);
+});
+
+test("rollbacks are included in provenance timelines", async () => {
+  const stores = await seedStores();
+
+  await stores.rollbackStore.recordRollback({
+    eventType: "ROLLBACK",
+    eventHash: "rollback-1",
+    fromPolicyHash: "policy-456",
+    toPolicyHash: policyHash,
+    actor: "release-manager",
+    rationale: "Rollback after regression.",
+    createdAt: "2024-04-06T09:00:00.000Z"
+  });
+
+  const report = await buildPolicyProvenanceReport({
+    policyHash,
+    activePolicyHash: policyHash,
+    lifecycleStore: stores.lifecycleStore,
+    lineageStore: stores.lineageStore,
+    replayStore: stores.replayStore,
+    guardrailCheckStore: stores.guardrailCheckStore,
+    approvalStore: stores.approvalStore,
+    outcomeStore: stores.outcomeStore,
+    rollbackStore: stores.rollbackStore
+  });
+
+  expect(report.lastRollback?.eventHash).toBe("rollback-1");
+  expect(report.lifecycle.events.some((event) => event.type === "rollback")).toBe(true);
 });
 
 test("produces a stable report hash across builds", async () => {
@@ -247,7 +282,8 @@ test("produces a stable report hash across builds", async () => {
     replayStore: stores.replayStore,
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
-    outcomeStore: stores.outcomeStore
+    outcomeStore: stores.outcomeStore,
+    rollbackStore: stores.rollbackStore
   });
 
   const second = await buildPolicyProvenanceReport({
@@ -258,7 +294,8 @@ test("produces a stable report hash across builds", async () => {
     replayStore: stores.replayStore,
     guardrailCheckStore: stores.guardrailCheckStore,
     approvalStore: stores.approvalStore,
-    outcomeStore: stores.outcomeStore
+    outcomeStore: stores.outcomeStore,
+    rollbackStore: stores.rollbackStore
   });
 
   expect(second.reportHash).toBe(first.reportHash);

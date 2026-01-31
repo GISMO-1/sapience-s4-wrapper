@@ -12,6 +12,8 @@ import type { PolicyApprovalStore } from "../src/policy-approvals/store";
 import { InMemoryPolicyApprovalStore } from "../src/policy-approvals/store";
 import type { PolicyOutcomeStore } from "../src/policy-outcomes/store";
 import { InMemoryPolicyOutcomeStore } from "../src/policy-outcomes/store";
+import type { PolicyRollbackStore } from "../src/policy-rollback/store";
+import { InMemoryPolicyRollbackStore } from "../src/policy-rollback/store";
 import type { DriftReport } from "../src/policy-drift/types";
 import type { PolicyImpactReport } from "../src/policy-impact/types";
 
@@ -21,7 +23,8 @@ const stores = vi.hoisted(() => ({
   replayStore: null as PolicyReplayStore | null,
   guardrailCheckStore: null as GuardrailCheckStore | null,
   approvalStore: null as PolicyApprovalStore | null,
-  outcomeStore: null as PolicyOutcomeStore | null
+  outcomeStore: null as PolicyOutcomeStore | null,
+  rollbackStore: null as PolicyRollbackStore | null
 }));
 
 vi.mock("../src/policy-lifecycle/store", async () => {
@@ -75,6 +78,14 @@ vi.mock("../src/policy-outcomes/store", async () => {
   return {
     ...actual,
     createPolicyOutcomeStore: () => stores.outcomeStore as PolicyOutcomeStore
+  };
+});
+
+vi.mock("../src/policy-rollback/store", async () => {
+  const actual = await vi.importActual<typeof import("../src/policy-rollback/store")>("../src/policy-rollback/store");
+  return {
+    ...actual,
+    createPolicyRollbackStore: () => stores.rollbackStore as PolicyRollbackStore
   };
 });
 
@@ -200,6 +211,7 @@ test("returns provenance report with markdown export", async () => {
   ]);
 
   const outcomeStore = new InMemoryPolicyOutcomeStore();
+  const rollbackStore = new InMemoryPolicyRollbackStore();
   await outcomeStore.recordOutcome({
     traceId: "trace-1",
     intentType: "CREATE_PO",
@@ -257,6 +269,7 @@ test("returns provenance report with markdown export", async () => {
   stores.guardrailCheckStore = guardrailCheckStore;
   stores.approvalStore = approvalStore;
   stores.outcomeStore = outcomeStore;
+  stores.rollbackStore = rollbackStore;
 
   const app = await buildApp();
 

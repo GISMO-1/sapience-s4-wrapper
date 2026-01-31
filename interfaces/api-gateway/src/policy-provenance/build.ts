@@ -10,6 +10,8 @@ import type { PolicyReplayStore } from "../policy-replay/replay-store";
 import type { GuardrailCheckStore } from "../policy-promotion-guardrails/store";
 import type { PolicyApprovalStore } from "../policy-approvals/store";
 import type { PolicyOutcomeStore } from "../policy-outcomes/store";
+import type { PolicyRollbackStore } from "../policy-rollback/store";
+import type { RollbackEvent } from "../policy-rollback/types";
 import type { GuardrailDecision, GuardrailCheckRecord } from "../policy-promotion-guardrails/types";
 import type { PolicyApprovalRecord } from "../policy-approvals/types";
 import { verifyPolicyDeterminism } from "../policy-verifier/verify";
@@ -28,6 +30,7 @@ type BuildInput = {
   guardrailCheckStore: GuardrailCheckStore;
   approvalStore: PolicyApprovalStore;
   outcomeStore: PolicyOutcomeStore;
+  rollbackStore: PolicyRollbackStore;
   policyInfo?: PolicyInfo;
 };
 
@@ -170,6 +173,17 @@ function normalizeTimeline(timeline: PolicyLifecycleTimeline): PolicyLifecycleTi
   };
 }
 
+function normalizeRollbacks(rollbacks: RollbackEvent[]): RollbackEvent[] {
+  return rollbacks
+    .slice()
+    .sort((a, b) => {
+      if (a.createdAt !== b.createdAt) {
+        return a.createdAt.localeCompare(b.createdAt);
+      }
+      return a.eventHash.localeCompare(b.eventHash);
+    });
+}
+
 function parseTimestamp(value: string | null | undefined): number | null {
   if (!value) {
     return null;
@@ -242,7 +256,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
   const status = input.lifecycleStore.getStatus(input.policyHash);
   const activePolicyHash = input.activePolicyHash ?? input.lifecycleStore.getActivePolicy()?.policyHash ?? null;
 
-  const [lineage, activeLineageChain, simulations, guardrailChecksRaw, approvalsRaw, events] = await Promise.all([
+  const [lineage, activeLineageChain, simulations, guardrailChecksRaw, approvalsRaw, events, rollbacksRaw] =
+    await Promise.all([
     input.lineageStore.getLineage(input.policyHash),
     activePolicyHash ? input.lineageStore.getLineageChain(activePolicyHash) : Promise.resolve([]),
     input.replayStore.listRuns({ policyHash: input.policyHash, limit: 200 }),
@@ -258,7 +273,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
         approvalStore: input.approvalStore,
         lineageStore: input.lineageStore
       }
-    })
+    }),
+    input.rollbackStore.listRollbacks({ policyHash: input.policyHash })
   ]);
 
   const timeline = normalizeTimeline(
@@ -269,12 +285,14 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
       activeLineageChain,
       simulations,
       guardrailChecks: guardrailChecksRaw,
-      approvals: approvalsRaw
+      approvals: approvalsRaw,
+      rollbacks: rollbacksRaw
     })
   );
 
   const guardrailChecks = normalizeGuardrailChecks(guardrailChecksRaw);
   const approvals = normalizeApprovals(approvalsRaw);
+  const rollbacks = normalizeRollbacks(rollbacksRaw);
 
   const asOf = resolveAsOfTimestamp([
     status?.updatedAt,
@@ -283,7 +301,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
     ...simulations.map((run) => run.createdAt.toISOString()),
     ...guardrailChecks.map((check) => check.evaluatedAt),
     ...approvals.map((approval) => approval.approvedAt),
-    ...events.map((event) => event.occurredAt)
+    ...events.map((event) => event.occurredAt),
+    ...rollbacks.map((rollback) => rollback.createdAt)
   ]);
 
   const driftWindows = defaultDriftWindow(new Date(asOf));
@@ -309,7 +328,8 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
         outcomeStore: input.outcomeStore,
         lineageStore: input.lineageStore,
         guardrailCheckStore: input.guardrailCheckStore,
-        approvalStore: input.approvalStore
+        approvalStore: input.approvalStore,
+        rollbackStore: input.rollbackStore
       }
     })
   );
@@ -324,6 +344,7 @@ export async function buildPolicyProvenanceReport(input: BuildInput): Promise<Po
       activePolicyHash
     }),
     lifecycle: timeline,
+    lastRollback: rollbacks.length ? rollbacks[rollbacks.length - 1] : null,
     guardrailChecks,
     approvals,
     driftReport,
@@ -367,6 +388,16 @@ export function buildPolicyProvenanceMarkdown(report: PolicyProvenanceReport): s
     report.lifecycle.events.forEach((event) => {
       lines.push(`- ${event.timestamp} · ${event.type} · ${event.actor}: ${event.rationale}`);
     });
+  }
+  lines.push("");
+  lines.push("## Rollbacks");
+  lines.push("");
+  if (!report.lastRollback) {
+    lines.push("- No rollback events recorded.");
+  } else {
+    lines.push(`- Latest rollback: ${report.lastRollback.createdAt} · ${report.lastRollback.actor}`);
+    lines.push(`- From: ${report.lastRollback.fromPolicyHash} → To: ${report.lastRollback.toPolicyHash}`);
+    lines.push(`- Rationale: ${report.lastRollback.rationale}`);
   }
   lines.push("");
   lines.push("## Guardrail Checks");

@@ -2,6 +2,7 @@ import type { PolicyLineageRecord } from "../policy-lineage/types";
 import type { PolicyApprovalRecord } from "../policy-approvals/types";
 import type { ReplayRunRecord } from "../policy-replay/types";
 import type { GuardrailCheckRecord } from "../policy-promotion-guardrails/types";
+import type { RollbackEvent } from "../policy-rollback/types";
 
 export enum PolicyLifecycleState {
   DRAFT = "DRAFT",
@@ -12,7 +13,7 @@ export enum PolicyLifecycleState {
   SUPERSEDED = "SUPERSEDED"
 }
 
-export type PolicyLifecycleEventType = "simulation" | "guardrail_check" | "approval" | "promotion";
+export type PolicyLifecycleEventType = "simulation" | "guardrail_check" | "approval" | "promotion" | "rollback";
 
 export type PolicyLifecycleEvent = {
   type: PolicyLifecycleEventType;
@@ -40,7 +41,8 @@ const EVENT_ORDER: Record<PolicyLifecycleEventType, number> = {
   simulation: 1,
   guardrail_check: 2,
   approval: 3,
-  promotion: 4
+  promotion: 4,
+  rollback: 5
 };
 
 const FALLBACK_ACTOR = "system";
@@ -93,6 +95,7 @@ export function buildPolicyLifecycleTimeline(input: {
   simulations: ReplayRunRecord[];
   guardrailChecks: GuardrailCheckRecord[];
   approvals: PolicyApprovalRecord[];
+  rollbacks?: RollbackEvent[];
 }): PolicyLifecycleTimeline {
   const events: PolicyLifecycleEvent[] = [];
 
@@ -131,6 +134,15 @@ export function buildPolicyLifecycleTimeline(input: {
       rationale: input.lineage.rationale
     });
   }
+
+  input.rollbacks?.forEach((rollback) => {
+    events.push({
+      type: "rollback",
+      timestamp: normalizeTimestamp(rollback.createdAt),
+      actor: rollback.actor,
+      rationale: rollback.rationale
+    });
+  });
 
   const supersededByActive =
     Boolean(input.activePolicyHash) &&

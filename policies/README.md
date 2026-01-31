@@ -185,6 +185,27 @@ Example: fetch the current lineage chain:
 curl -s http://localhost:3000/v1/policy/lineage/current | jq
 ```
 
+## Policy rollback & reconciliation
+
+Rollbacks let you deterministically revert to a previously promoted policy hash, while reconciliation provides a semantic diff (rules added/removed/modified) between policy states.
+
+Example: dry-run a rollback:
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/rollback \\
+  -H 'content-type: application/json' \\
+  -d '{\"targetPolicyHash\":\"POLICY_HASH\",\"actor\":\"analyst\",\"rationale\":\"Rollback after regression\",\"dryRun\":true}' | jq
+```
+
+Example: reconcile two policy hashes:
+```bash
+curl -s \"http://localhost:3000/v1/policy/reconcile?fromPolicyHash=HASH_A&toPolicyHash=HASH_B\" | jq
+```
+
+Example: reconcile using a time window:
+```bash
+curl -s \"http://localhost:3000/v1/policy/reconcile?since=2024-03-01T00:00:00.000Z&until=2024-03-10T00:00:00.000Z\" | jq
+```
+
 ## Outcome feedback loop
 
 Real-world outcomes can be recorded against a trace ID to build an outcome-weighted quality signal for policies. Outcomes must reference an existing intent + policy decision. Severity ranges from 1 (low) to 5 (high).

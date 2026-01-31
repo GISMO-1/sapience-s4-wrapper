@@ -105,7 +105,8 @@ button:disabled {
 }
 
 .sandbox-row input[type="text"],
-.sandbox-row input[type="number"] {
+.sandbox-row input[type="number"],
+.sandbox-row select {
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
   border: 1px solid #d0d7e2;

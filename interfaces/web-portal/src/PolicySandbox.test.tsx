@@ -26,7 +26,9 @@ vi.mock("./api", () => ({
   executeIntent: vi.fn(),
   fetchPromotionCheck: vi.fn(),
   fetchPolicyTimeline: vi.fn(),
-  fetchPolicyVerify: vi.fn()
+  fetchPolicyVerify: vi.fn(),
+  rollbackPolicy: vi.fn(),
+  reconcilePolicy: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -394,10 +396,16 @@ test("determinism panel verifies and shows first mismatch", async () => {
 
   render(<PolicySandbox />);
 
-  const policyHashInput = await screen.findByLabelText(/Policy hash/i);
+  const determinismCard = (await screen.findByRole("heading", { name: /Determinism \/ Integrity/i })).closest(
+    ".sandbox-card"
+  ) as HTMLElement | null;
+  if (!determinismCard) {
+    throw new Error("Determinism panel not found");
+  }
+  const policyHashInput = within(determinismCard).getByLabelText(/Policy hash/i);
   fireEvent.change(policyHashInput, { target: { value: "policy-1" } });
 
-  fireEvent.click(screen.getByRole("button", { name: /verify/i }));
+  fireEvent.click(within(determinismCard).getByRole("button", { name: /verify/i }));
 
   await waitFor(() => {
     expect(fetchPolicyVerify).toHaveBeenCalledWith(expect.objectContaining({ policyHash: "policy-1" }));
@@ -585,4 +593,164 @@ test("execution gate fetches decision and shows missing approvals", async () => 
   fireEvent.click(screen.getByRole("button", { name: /Execute/i }));
 
   await screen.findByText(/Missing approvals:/i);
+});
+
+test("rollback panel executes a dry run and renders the decision", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, rollbackPolicy } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: [
+      {
+        policyHash: "policy-1",
+        parentPolicyHash: "policy-0",
+        promotedBy: "Reviewer",
+        promotedAt: "2024-02-10T10:00:00Z",
+        rationale: "Latest promotion.",
+        acceptedRiskScore: 12,
+        source: "manual",
+        drift: { constraintsAdded: 0, constraintsRemoved: 0, severityDelta: 0, netRiskScoreChange: 0 }
+      },
+      {
+        policyHash: "policy-0",
+        parentPolicyHash: null,
+        promotedBy: "Reviewer",
+        promotedAt: "2024-01-01T10:00:00Z",
+        rationale: "Baseline.",
+        acceptedRiskScore: 10,
+        source: "manual",
+        drift: { constraintsAdded: 0, constraintsRemoved: 0, severityDelta: 0, netRiskScoreChange: 0 }
+      }
+    ]
+  });
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(rollbackPolicy).mockResolvedValue({
+    ok: true,
+    status: 200,
+    data: {
+      traceId: "trace-1",
+      decision: {
+        ok: true,
+        fromPolicyHash: "policy-1",
+        toPolicyHash: "policy-0",
+        decisionHash: "decision-hash-1",
+        reasons: [],
+        createdAt: "2024-02-11T10:00:00Z"
+      },
+      event: null
+    }
+  });
+
+  render(<PolicySandbox />);
+
+  const rollbackCard = (await screen.findByRole("heading", { name: /Policy Rollback/i })).closest(
+    ".sandbox-card"
+  ) as HTMLElement | null;
+  if (!rollbackCard) {
+    throw new Error("Rollback panel not found");
+  }
+  fireEvent.change(within(rollbackCard).getByLabelText(/Actor/i), { target: { value: "Analyst" } });
+  fireEvent.change(within(rollbackCard).getByPlaceholderText(/Explain the rollback/i), {
+    target: { value: "Regression detected." }
+  });
+  fireEvent.click(within(rollbackCard).getByRole("button", { name: /dry run rollback/i }));
+
+  await waitFor(() => {
+    expect(rollbackPolicy).toHaveBeenCalledWith({
+      targetPolicyHash: "policy-0",
+      actor: "Analyst",
+      rationale: "Regression detected.",
+      dryRun: true
+    });
+  });
+
+  expect(await screen.findByText(/decision-hash-1/i)).toBeInTheDocument();
+});
+
+test("reconciliation panel renders summary results", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyQuality, fetchPolicyDrift, reconcilePolicy } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: [
+      {
+        policyHash: "policy-1",
+        parentPolicyHash: "policy-0",
+        promotedBy: "Reviewer",
+        promotedAt: "2024-02-10T10:00:00Z",
+        rationale: "Latest promotion.",
+        acceptedRiskScore: 12,
+        source: "manual",
+        drift: { constraintsAdded: 0, constraintsRemoved: 0, severityDelta: 0, netRiskScoreChange: 0 }
+      },
+      {
+        policyHash: "policy-0",
+        parentPolicyHash: null,
+        promotedBy: "Reviewer",
+        promotedAt: "2024-01-01T10:00:00Z",
+        rationale: "Baseline.",
+        acceptedRiskScore: 10,
+        source: "manual",
+        drift: { constraintsAdded: 0, constraintsRemoved: 0, severityDelta: 0, netRiskScoreChange: 0 }
+      }
+    ]
+  });
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(reconcilePolicy).mockResolvedValue({
+    traceId: "trace-1",
+    report: {
+      fromPolicyHash: "policy-1",
+      toPolicyHash: "policy-0",
+      summary: {
+        rulesAdded: 1,
+        rulesRemoved: 0,
+        rulesModified: 1,
+        approvalsAdded: ["FINANCE_REVIEWER"],
+        approvalsRemoved: [],
+        defaultsChanged: false,
+        autoExecutionApprovalsChanged: false
+      },
+      rulesAdded: [
+        {
+          ruleId: "rule-new",
+          rule: {
+            id: "rule-new",
+            enabled: true,
+            priority: 50,
+            appliesTo: { intentTypes: ["CREATE_PO"] },
+            constraints: [],
+            decision: "WARN",
+            reason: "New rule",
+            tags: ["finance"]
+          },
+          approvalRoles: ["FINANCE_REVIEWER"]
+        }
+      ],
+      rulesRemoved: [],
+      rulesModified: [],
+      reportHash: "report-hash-1"
+    }
+  });
+
+  render(<PolicySandbox />);
+
+  const reconcileCard = (await screen.findByRole("heading", { name: /Policy Reconciliation/i })).closest(
+    ".sandbox-card"
+  ) as HTMLElement | null;
+  if (!reconcileCard) {
+    throw new Error("Reconciliation panel not found");
+  }
+  fireEvent.change(within(reconcileCard).getByLabelText(/From policy hash/i), { target: { value: "policy-1" } });
+  fireEvent.change(within(reconcileCard).getByLabelText(/To policy hash/i), { target: { value: "policy-0" } });
+  fireEvent.click(within(reconcileCard).getByRole("button", { name: /reconcile/i }));
+
+  await waitFor(() => {
+    expect(reconcilePolicy).toHaveBeenCalled();
+  });
+
+  expect(await within(reconcileCard).findByText(/report-hash-1/i)).toBeInTheDocument();
+  const approvals = await within(reconcileCard).findAllByText(/FINANCE_REVIEWER/i);
+  expect(approvals.length).toBeGreaterThan(0);
 });

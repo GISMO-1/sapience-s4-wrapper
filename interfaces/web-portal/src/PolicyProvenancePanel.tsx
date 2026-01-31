@@ -119,6 +119,12 @@ export function PolicyProvenancePanel() {
                   <li>
                     <strong>Approvals:</strong> {report.approvals.length}
                   </li>
+                  <li>
+                    <strong>Last rollback:</strong>{" "}
+                    {report.lastRollback
+                      ? `${report.lastRollback.createdAt} (${report.lastRollback.fromPolicyHash} → ${report.lastRollback.toPolicyHash})`
+                      : "n/a"}
+                  </li>
                 </ul>
               </div>
               <div>

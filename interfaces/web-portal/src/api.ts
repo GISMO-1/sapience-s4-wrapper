@@ -362,7 +362,7 @@ export async function fetchPolicyLineageByHash(policyHash: string): Promise<Poli
 }
 
 export type PolicyLifecycleEvent = {
-  type: "simulation" | "guardrail_check" | "approval" | "promotion";
+  type: "simulation" | "guardrail_check" | "approval" | "promotion" | "rollback";
   timestamp: string;
   actor: string;
   rationale: string;
@@ -408,6 +408,124 @@ export async function recordPolicyOutcome(payload: {
 
 export async function fetchPolicyQuality(policyHash: string): Promise<PolicyQualityResponse> {
   return fetchJson(buildUrl(`/v1/policy/quality?policyHash=${encodeURIComponent(policyHash)}`));
+}
+
+export type RollbackRequest = {
+  targetPolicyHash: string;
+  actor: string;
+  rationale: string;
+  dryRun?: boolean;
+};
+
+export type RollbackDecision = {
+  ok: boolean;
+  fromPolicyHash: string;
+  toPolicyHash: string;
+  decisionHash: string;
+  reasons: string[];
+  createdAt: string;
+};
+
+export type RollbackEvent = {
+  eventType: "ROLLBACK";
+  eventHash: string;
+  fromPolicyHash: string;
+  toPolicyHash: string;
+  actor: string;
+  rationale: string;
+  createdAt: string;
+};
+
+export type RuleSnapshot = {
+  ruleId: string;
+  rule: {
+    id: string;
+    enabled: boolean;
+    priority: number;
+    appliesTo: { intentTypes: string[] };
+    constraints: Array<{ type: string; params: Record<string, unknown> }>;
+    decision: string;
+    reason: string;
+    tags: string[];
+  };
+  approvalRoles: string[];
+};
+
+export type RuleModificationDelta = {
+  enabledChanged: boolean;
+  decisionChanged: boolean;
+  priorityDelta: number;
+  tagsAdded: string[];
+  tagsRemoved: string[];
+  intentTypesAdded: string[];
+  intentTypesRemoved: string[];
+  constraintsAdded: Array<{ type: string; params: Record<string, unknown> }>;
+  constraintsRemoved: Array<{ type: string; params: Record<string, unknown> }>;
+  approvalsAdded: string[];
+  approvalsRemoved: string[];
+};
+
+export type RuleModified = {
+  ruleId: string;
+  before: RuleSnapshot;
+  after: RuleSnapshot;
+  changes: RuleModificationDelta;
+};
+
+export type ReconcileReport = {
+  fromPolicyHash: string;
+  toPolicyHash: string;
+  summary: {
+    rulesAdded: number;
+    rulesRemoved: number;
+    rulesModified: number;
+    approvalsAdded: string[];
+    approvalsRemoved: string[];
+    defaultsChanged: boolean;
+    autoExecutionApprovalsChanged: boolean;
+  };
+  rulesAdded: RuleSnapshot[];
+  rulesRemoved: RuleSnapshot[];
+  rulesModified: RuleModified[];
+  reportHash: string;
+};
+
+export async function rollbackPolicy(payload: RollbackRequest): Promise<{
+  ok: boolean;
+  status: number;
+  data: { traceId: string; decision: RollbackDecision; event?: RollbackEvent | null } | { message: string; traceId: string; decision?: RollbackDecision };
+}> {
+  const response = await fetch(buildUrl("/v1/policy/rollback"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const text = await response.text();
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") && text ? JSON.parse(text) : text;
+  return { ok: response.ok, status: response.status, data };
+}
+
+export async function reconcilePolicy(params: {
+  fromPolicyHash?: string;
+  toPolicyHash?: string;
+  since?: string;
+  until?: string;
+}): Promise<{ traceId: string; report: ReconcileReport }> {
+  const query = new URLSearchParams();
+  if (params.fromPolicyHash) {
+    query.set("fromPolicyHash", params.fromPolicyHash);
+  }
+  if (params.toPolicyHash) {
+    query.set("toPolicyHash", params.toPolicyHash);
+  }
+  if (params.since) {
+    query.set("since", params.since);
+  }
+  if (params.until) {
+    query.set("until", params.until);
+  }
+  return fetchJson(buildUrl(`/v1/policy/reconcile?${query.toString()}`));
 }
 
 export type DriftWindow = { since: string; until: string };
@@ -526,6 +644,7 @@ export type PolicyProvenanceReport = {
   asOf: string;
   metadata: PolicyProvenanceMetadata;
   lifecycle: PolicyLifecycleTimeline;
+  lastRollback: RollbackEvent | null;
   guardrailChecks: Array<{
     id: string;
     policyHash: string;

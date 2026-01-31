@@ -13,11 +13,13 @@ import { createPolicyReplayStore } from "../policy-replay/replay-store";
 import { createPolicyLineageStore } from "../policy-lineage/store";
 import { createPolicyGuardrailCheckStore } from "../policy-promotion-guardrails/store";
 import { createPolicyApprovalStore } from "../policy-approvals/store";
+import { createPolicyRollbackStore } from "../policy-rollback/store";
 import type { PolicyOutcomeStore } from "../policy-outcomes/store";
 import type { PolicyReplayStore } from "../policy-replay/replay-store";
 import type { PolicyLineageStore } from "../policy-lineage/store";
 import type { GuardrailCheckStore } from "../policy-promotion-guardrails/store";
 import type { PolicyApprovalStore } from "../policy-approvals/store";
+import type { PolicyRollbackStore } from "../policy-rollback/store";
 import { replayEventLog, type ReplayWindow } from "./replay";
 import type { DerivedSnapshot, VerificationMismatch } from "./types";
 
@@ -38,6 +40,7 @@ export type VerifyInput = {
     lineageStore?: PolicyLineageStore;
     guardrailCheckStore?: GuardrailCheckStore;
     approvalStore?: PolicyApprovalStore;
+    rollbackStore?: PolicyRollbackStore;
   };
   events?: PolicyEvent[];
 };
@@ -235,15 +238,17 @@ async function buildLiveSnapshot(input: {
     lineageStore: PolicyLineageStore;
     guardrailCheckStore: GuardrailCheckStore;
     approvalStore: PolicyApprovalStore;
+    rollbackStore: PolicyRollbackStore;
   };
 }): Promise<DerivedSnapshot> {
   const { policyHash } = input;
-  const [lineage, activeLineageChain, simulations, guardrailChecks, approvals] = await Promise.all([
+  const [lineage, activeLineageChain, simulations, guardrailChecks, approvals, rollbacks] = await Promise.all([
     input.stores.lineageStore.getLineage(policyHash),
     input.activePolicyHash ? input.stores.lineageStore.getLineageChain(input.activePolicyHash) : Promise.resolve([]),
     input.stores.replayStore.listRuns({ policyHash, limit: 200 }),
     input.stores.guardrailCheckStore.listChecks(policyHash),
-    input.stores.approvalStore.listApprovals(policyHash)
+    input.stores.approvalStore.listApprovals(policyHash),
+    input.stores.rollbackStore.listRollbacks({ policyHash })
   ]);
 
   const lifecycle = buildPolicyLifecycleTimeline({
@@ -253,7 +258,8 @@ async function buildLiveSnapshot(input: {
     activeLineageChain,
     simulations,
     guardrailChecks,
-    approvals
+    approvals,
+    rollbacks
   });
 
   const outcomes = await input.stores.outcomeStore.listOutcomes({
@@ -320,6 +326,7 @@ export async function verifyPolicyDeterminism(input: VerifyInput) {
   const lineageStore = input.stores?.lineageStore ?? createPolicyLineageStore();
   const guardrailCheckStore = input.stores?.guardrailCheckStore ?? createPolicyGuardrailCheckStore();
   const approvalStore = input.stores?.approvalStore ?? createPolicyApprovalStore();
+  const rollbackStore = input.stores?.rollbackStore ?? createPolicyRollbackStore();
 
   const liveSnapshot = await buildLiveSnapshot({
     policyHash: input.policyHash,
@@ -331,7 +338,8 @@ export async function verifyPolicyDeterminism(input: VerifyInput) {
       outcomeStore,
       lineageStore,
       guardrailCheckStore,
-      approvalStore
+      approvalStore,
+      rollbackStore
     }
   });
 

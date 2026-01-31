@@ -5,6 +5,7 @@ import type { PolicyApprovalRecord } from "../policy-approvals/types";
 import type { DriftReport, DriftWindow } from "../policy-drift/types";
 import type { PolicyImpactReport } from "../policy-impact/types";
 import type { VerificationMismatch } from "../policy-verifier/types";
+import type { RollbackEvent } from "../policy-rollback/types";
 
 export type PolicyProvenanceMetadata = {
   policyHash: string;
@@ -43,6 +44,7 @@ export type PolicyProvenanceReport = {
   asOf: string;
   metadata: PolicyProvenanceMetadata;
   lifecycle: PolicyLifecycleTimeline;
+  lastRollback: RollbackEvent | null;
   guardrailChecks: GuardrailCheckRecord[];
   approvals: PolicyApprovalRecord[];
   driftReport: DriftReport | null;

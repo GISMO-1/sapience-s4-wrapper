@@ -3,6 +3,7 @@ import type { PolicyLineageRecord } from "../src/policy-lineage/types";
 import type { ReplayRunRecord } from "../src/policy-replay/types";
 import type { GuardrailCheckRecord } from "../src/policy-promotion-guardrails/types";
 import type { PolicyApprovalRecord } from "../src/policy-approvals/types";
+import type { RollbackEvent } from "../src/policy-rollback/types";
 import {
   PolicyLifecycleState,
   buildPolicyLifecycleTimeline,
@@ -96,6 +97,16 @@ const baseApproval: PolicyApprovalRecord = {
   runId: "run-1"
 };
 
+const baseRollback: RollbackEvent = {
+  eventType: "ROLLBACK",
+  eventHash: "rollback-1",
+  fromPolicyHash: "policy-2",
+  toPolicyHash: "policy-1",
+  actor: "SRE",
+  rationale: "Rollback after incident.",
+  createdAt: "2024-02-01T13:00:00Z"
+};
+
 test("state derivation is deterministic", () => {
   const facts = {
     policyHash: "policy-1",
@@ -154,7 +165,8 @@ test("replaying the same inputs yields identical timelines", () => {
     activeLineageChain: [baseLineage],
     simulations: [baseSimulation],
     guardrailChecks: [baseGuardrailCheck],
-    approvals: [baseApproval]
+    approvals: [baseApproval],
+    rollbacks: [baseRollback]
   });
 
   const timelineB = buildPolicyLifecycleTimeline({
@@ -164,8 +176,24 @@ test("replaying the same inputs yields identical timelines", () => {
     activeLineageChain: [baseLineage],
     simulations: [{ ...baseSimulation, id: "run-1" }],
     guardrailChecks: [{ ...baseGuardrailCheck, id: "check-1" }],
-    approvals: [{ ...baseApproval, id: "approval-1" }]
+    approvals: [{ ...baseApproval, id: "approval-1" }],
+    rollbacks: [{ ...baseRollback, eventHash: "rollback-1" }]
   });
 
   expect(timelineA).toEqual(timelineB);
+});
+
+test("rollback events appear in the lifecycle timeline", () => {
+  const timeline = buildPolicyLifecycleTimeline({
+    policyHash: "policy-1",
+    activePolicyHash: "policy-1",
+    lineage: baseLineage,
+    activeLineageChain: [baseLineage],
+    simulations: [baseSimulation],
+    guardrailChecks: [baseGuardrailCheck],
+    approvals: [baseApproval],
+    rollbacks: [baseRollback]
+  });
+
+  expect(timeline.events.some((event) => event.type === "rollback")).toBe(true);
 });

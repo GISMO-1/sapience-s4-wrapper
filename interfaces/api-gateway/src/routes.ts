@@ -39,6 +39,9 @@ import { verifyPolicyDeterminism } from "./policy-verifier/verify";
 import { buildPolicyProvenanceMarkdown, buildPolicyProvenanceReport } from "./policy-provenance/build";
 import { createPolicyPackRegistry, PolicyPackError } from "./policy-packs/registry";
 import { installPolicyPack } from "./policy-packs/install";
+import { createPolicyRollbackStore } from "./policy-rollback/store";
+import { computeRollbackDecision } from "./policy-rollback/compute";
+import { buildReconcileReport, resolvePolicyDocumentByHash, resolvePolicyHashesForWindow } from "./policy-rollback/reconcile";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -54,6 +57,7 @@ const promotionStore = createPolicyPromotionStore();
 const guardrailCheckStore = createPolicyGuardrailCheckStore();
 const policyApprovalStore = createPolicyApprovalStore();
 const policyPackRegistry = createPolicyPackRegistry();
+const rollbackStore = createPolicyRollbackStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -217,6 +221,24 @@ const policyProvenanceQuerySchema = z.object({
   policyHash: z.string().min(1),
   format: z.enum(["md"]).optional()
 });
+
+const rollbackRequestSchema = z.object({
+  targetPolicyHash: z.string().min(1),
+  actor: z.string().min(1),
+  rationale: z.string().min(1),
+  dryRun: z.boolean().optional()
+});
+
+const policyReconcileQuerySchema = z.union([
+  z.object({
+    fromPolicyHash: z.string().min(1),
+    toPolicyHash: z.string().min(1)
+  }),
+  z.object({
+    since: z.string().datetime(),
+    until: z.string().datetime()
+  })
+]);
 
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
   switch (intentType) {
@@ -924,6 +946,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       guardrailCheckStore,
       approvalStore: policyApprovalStore,
       outcomeStore,
+      rollbackStore,
       policyInfo: activeSnapshot.info
     });
 
@@ -1196,14 +1219,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
     const { policyHash } = parsed.data;
     const activeSnapshot = policyEvaluator.getPolicySnapshot();
-    const activePolicyHash = activeSnapshot.info.hash;
+    const activePolicyHash = lifecycleStore.getActivePolicy()?.policyHash ?? activeSnapshot.info.hash;
 
-    const [lineage, activeLineageChain, simulations, guardrailChecks, approvals] = await Promise.all([
+    const [lineage, activeLineageChain, simulations, guardrailChecks, approvals, rollbacks] = await Promise.all([
       lineageStore.getLineage(policyHash),
       lineageStore.getLineageChain(activePolicyHash),
       replayStore.listRuns({ policyHash, limit: 200 }),
       guardrailCheckStore.listChecks(policyHash),
-      policyApprovalStore.listApprovals(policyHash)
+      policyApprovalStore.listApprovals(policyHash),
+      rollbackStore.listRollbacks({ policyHash })
     ]);
 
     return buildPolicyLifecycleTimeline({
@@ -1213,7 +1237,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       activeLineageChain,
       simulations,
       guardrailChecks,
-      approvals
+      approvals,
+      rollbacks
     });
   });
 
@@ -1238,6 +1263,103 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Lineage not found", traceId };
     }
     return { traceId, policyHash, lineage };
+  });
+
+  app.post("/v1/policy/rollback", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = rollbackRequestSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid rollback request", traceId };
+    }
+
+    const { decision, event } = await computeRollbackDecision({
+      request: parsed.data,
+      lineageStore,
+      lifecycleStore,
+      rollbackStore,
+      evaluator: policyEvaluator
+    });
+
+    if (!decision.ok) {
+      const notFound = decision.reasons.some((reason) => reason.includes("lineage store"));
+      reply.code(notFound ? 404 : 409);
+      return { message: "Rollback rejected.", traceId, decision };
+    }
+
+    return { traceId, decision, event };
+  });
+
+  app.get("/v1/policy/reconcile", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const rawQuery = (request.query ?? {}) as Record<string, unknown>;
+    const hasHashQuery = "fromPolicyHash" in rawQuery || "toPolicyHash" in rawQuery;
+    const hasWindowQuery = "since" in rawQuery || "until" in rawQuery;
+
+    if (hasHashQuery && hasWindowQuery) {
+      reply.code(400);
+      return { message: "Provide either policy hashes or a time window, not both.", traceId };
+    }
+
+    const parsed = policyReconcileQuerySchema.safeParse(rawQuery);
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid policy reconcile request", traceId };
+    }
+
+    const activePolicyHash = lifecycleStore.getActivePolicy()?.policyHash ?? policyEvaluator.getPolicySnapshot().info.hash;
+    let fromPolicyHash: string;
+    let toPolicyHash: string;
+
+    if ("fromPolicyHash" in parsed.data) {
+      fromPolicyHash = parsed.data.fromPolicyHash;
+      toPolicyHash = parsed.data.toPolicyHash;
+    } else {
+      const since = new Date(parsed.data.since);
+      const until = new Date(parsed.data.until);
+      if (since.getTime() > until.getTime()) {
+        reply.code(400);
+        return { message: "Invalid policy reconcile request", traceId };
+      }
+      const resolved = await resolvePolicyHashesForWindow({
+        since,
+        until,
+        activePolicyHash,
+        lineageStore,
+        rollbackStore
+      });
+      fromPolicyHash = resolved.fromPolicyHash;
+      toPolicyHash = resolved.toPolicyHash;
+    }
+
+    try {
+      const [fromPolicy, toPolicy] = await Promise.all([
+        resolvePolicyDocumentByHash({
+          policyHash: fromPolicyHash,
+          lifecycleStore,
+          evaluator: policyEvaluator,
+          policyPackRegistry
+        }),
+        resolvePolicyDocumentByHash({
+          policyHash: toPolicyHash,
+          lifecycleStore,
+          evaluator: policyEvaluator,
+          policyPackRegistry
+        })
+      ]);
+
+      const report = buildReconcileReport({
+        fromPolicyHash,
+        toPolicyHash,
+        fromPolicy,
+        toPolicy
+      });
+
+      return { traceId, report };
+    } catch (error) {
+      reply.code(404);
+      return { message: (error as Error).message, traceId };
+    }
   });
 
   app.get("/v1/policy/promote/check", async (request, reply) => {

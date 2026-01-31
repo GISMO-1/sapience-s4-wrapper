@@ -6,6 +6,7 @@ export type PolicyLineageStore = {
   createLineage: (input: PolicyLineageInput) => Promise<PolicyLineageRecord>;
   getLineage: (policyHash: string) => Promise<PolicyLineageRecord | null>;
   getLineageChain: (policyHash: string) => Promise<PolicyLineageRecord[]>;
+  listLineages: () => Promise<PolicyLineageRecord[]>;
 };
 
 export class InMemoryPolicyLineageStore implements PolicyLineageStore {
@@ -37,6 +38,15 @@ export class InMemoryPolicyLineageStore implements PolicyLineageStore {
     }
 
     return chain;
+  }
+
+  async listLineages(): Promise<PolicyLineageRecord[]> {
+    return Array.from(this.records.values()).sort((a, b) => {
+      if (a.promotedAt !== b.promotedAt) {
+        return a.promotedAt.localeCompare(b.promotedAt);
+      }
+      return a.policyHash.localeCompare(b.policyHash);
+    });
   }
 }
 
@@ -138,6 +148,16 @@ export class PostgresPolicyLineageStore implements PolicyLineageStore {
     );
     return result.rows.map((row: any) => mapRow(row));
   }
+
+  async listLineages(): Promise<PolicyLineageRecord[]> {
+    const result = await pool.query(
+      `SELECT policy_hash, parent_policy_hash, promoted_by, promoted_at, rationale, accepted_risk_score, source,
+              constraints_added, constraints_removed, severity_delta, net_risk_score_change
+       FROM policy_lineage
+       ORDER BY promoted_at ASC, policy_hash ASC`
+    );
+    return result.rows.map((row: any) => mapRow(row));
+  }
 }
 
 class FallbackPolicyLineageStore implements PolicyLineageStore {
@@ -167,6 +187,14 @@ class FallbackPolicyLineageStore implements PolicyLineageStore {
       return await this.primary.getLineageChain(policyHash);
     } catch (error) {
       return this.fallback.getLineageChain(policyHash);
+    }
+  }
+
+  async listLineages(): Promise<PolicyLineageRecord[]> {
+    try {
+      return await this.primary.listLineages();
+    } catch (error) {
+      return this.fallback.listLineages();
     }
   }
 }

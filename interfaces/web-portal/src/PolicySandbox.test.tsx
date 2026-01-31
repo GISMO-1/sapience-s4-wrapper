@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
-import type { ReplayReport, PolicyDriftResponse, PolicyImpactSimulationReport } from "./api";
+import type { ReplayReport, PolicyDriftResponse, PolicyImpactSimulationReport, PromotionGuardrailDecision } from "./api";
 
 vi.mock("./api", () => ({
   runPolicyReplay: vi.fn(),
@@ -16,7 +16,8 @@ vi.mock("./api", () => ({
   fetchPolicyImpactReport: vi.fn(),
   fetchIntentDecision: vi.fn(),
   approveIntent: vi.fn(),
-  executeIntent: vi.fn()
+  executeIntent: vi.fn(),
+  fetchPromotionCheck: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -154,6 +155,34 @@ const baseImpactReport: PolicyImpactSimulationReport = {
   ]
 };
 
+const baseGuardrailDecision: PromotionGuardrailDecision = {
+  allowed: false,
+  requiredAcceptance: true,
+  reasons: [
+    {
+      code: "BLAST_RADIUS_EXCEEDED",
+      message: "Blast radius exceeds guardrails.",
+      metric: 15,
+      threshold: 10
+    }
+  ],
+  snapshot: {
+    policyHash: "policy-1",
+    evaluatedAt: "2024-02-02T10:00:00Z",
+    drift: baseDrift.report,
+    impact: { ...baseImpactReport, impactedIntents: 1 },
+    quality: {
+      totalOutcomes: 2,
+      failureRate: 0.1,
+      overrideRate: 0.01,
+      weightedPenalty: 2,
+      qualityScore: 98,
+      score: 2
+    },
+    lineageHead: null
+  }
+};
+
 test("promotion button remains disabled when impact guardrails block promotion", async () => {
   const { runPolicyReplay, fetchReplayReport, fetchPolicyLineageCurrent, fetchPolicyDrift } = await import("./api");
   vi.mocked(runPolicyReplay).mockResolvedValue({ run: { runId: "run-1" } });
@@ -175,8 +204,9 @@ test("promotion button remains disabled when impact guardrails block promotion",
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  const rationaleInputs = screen.getAllByLabelText(/Rationale/i);
-  fireEvent.change(rationaleInputs[1], { target: { value: "Regression results match baseline." } });
+  fireEvent.change(screen.getByPlaceholderText(/Explain why the promotion is acceptable/i), {
+    target: { value: "Regression results match baseline." }
+  });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   await waitFor(() => {
@@ -202,8 +232,9 @@ test("promotion button enables after approval details when impact is within thre
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  const rationaleInputs = screen.getAllByLabelText(/Rationale/i);
-  fireEvent.change(rationaleInputs[1], { target: { value: "Regression results match baseline." } });
+  fireEvent.change(screen.getByPlaceholderText(/Explain why the promotion is acceptable/i), {
+    target: { value: "Regression results match baseline." }
+  });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   await waitFor(() => {
@@ -329,6 +360,67 @@ test("policy impact simulation renders blast radius summary", async () => {
   expect(await screen.findByText(/Blast radius/i)).toBeInTheDocument();
   expect(screen.getByText("10")).toBeInTheDocument();
   expect(screen.getByText(/NEWLY_BLOCKED/)).toBeInTheDocument();
+});
+
+test("promotion guardrail check renders reasons", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyDrift, fetchPolicyQuality, fetchPromotionCheck } =
+    await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPromotionCheck).mockResolvedValue({ traceId: "trace-1", ...baseGuardrailDecision });
+
+  render(<PolicySandbox />);
+
+  await waitFor(() => {
+    expect(screen.getAllByText("policy-1").length).toBeGreaterThan(0);
+  });
+  fireEvent.click(screen.getByRole("button", { name: /Check Promotion/i }));
+
+  await waitFor(() => {
+    expect(fetchPromotionCheck).toHaveBeenCalledWith("policy-1");
+  });
+
+  expect(await screen.findByText(/BLAST_RADIUS_EXCEEDED/i)).toBeInTheDocument();
+});
+
+test("blocked promotion requires force checkbox to enable promotion", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyDrift, fetchPolicyQuality, fetchPromotionCheck } =
+    await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(fetchPromotionCheck).mockResolvedValue({ traceId: "trace-1", ...baseGuardrailDecision });
+
+  render(<PolicySandbox />);
+
+  await waitFor(() => {
+    expect(screen.getAllByText("policy-1").length).toBeGreaterThan(0);
+  });
+  fireEvent.click(screen.getByRole("button", { name: /Check Promotion/i }));
+  await screen.findByText(/BLAST_RADIUS_EXCEEDED/i);
+
+  fireEvent.change(screen.getByLabelText(/Reviewer/i), { target: { value: "Reviewer" } });
+  fireEvent.change(screen.getByPlaceholderText(/Explain promotion acceptance/i), {
+    target: { value: "Guardrail override accepted for limited blast radius." }
+  });
+  fireEvent.change(screen.getByLabelText(/Accepted risk/i), { target: { value: "10" } });
+
+  const promoteButton = screen.getByRole("button", { name: /^Promote$/i });
+  expect(promoteButton).toBeDisabled();
+
+  fireEvent.click(screen.getByLabelText(/Force promote/i));
+  await waitFor(() => {
+    expect(promoteButton).toBeEnabled();
+  });
 });
 
 test("execution gate fetches decision and shows missing approvals", async () => {

@@ -152,6 +152,27 @@ POLICY_INLINE_ENABLED=true curl -s -X POST http://localhost:3000/v1/policy/repla
 
 Policy promotions now require a promotion rationale (minimum 10 characters) and an accepted risk score. Each promotion records a lineage entry linking the new policy hash to its parent, including a drift summary (constraints added/removed, severity delta, and net risk score change).
 
+## Promotion guardrails
+
+Guardrails enforce deterministic promotion checks based on impact blast radius, impacted intents, drift health state, severity delta, and quality score deviation. Use the check endpoint to inspect the decision before promotion.
+
+Example: check guardrails for a candidate policy hash:
+```bash
+curl -s "http://localhost:3000/v1/policy/promote/check?policyHash=POLICY_HASH" | jq
+```
+
+Example: promote with guardrail metadata:
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/promote \\
+  -H 'content-type: application/json' \\
+  -d '{\"policyHash\":\"POLICY_HASH\",\"reviewer\":\"Reviewer\",\"rationale\":\"Guardrails satisfied.\",\"acceptedRisk\":12}' | jq
+```
+
+Guardrail thresholds are configurable via environment variables:
+`PROMOTION_GUARDRAILS_ENABLED`, `PROMOTION_MAX_BLAST_RADIUS`, `PROMOTION_MAX_IMPACTED_INTENTS`,
+`PROMOTION_MAX_SEVERITY_DELTA`, `PROMOTION_MIN_HEALTH_STATE`, `PROMOTION_MAX_QUALITY_SCORE`,
+`PROMOTION_REQUIRE_RATIONALE`, and `PROMOTION_REQUIRE_ACCEPTED_RISK`.
+
 Example: promote with rationale metadata:
 ```bash
 curl -s -X POST http://localhost:3000/v1/policy/promote \\

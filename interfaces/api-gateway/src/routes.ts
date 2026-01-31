@@ -10,6 +10,7 @@ import { createIntentStore } from "./intent/intent-store";
 import { Intent, intentTypeSchema } from "./intent/intent-model";
 import { createPolicyEvaluator } from "./policy-code/evaluator";
 import { loadPolicyFromSource, PolicySourceError } from "./policy-code/loader";
+import type { CandidatePolicySnapshot, CandidatePolicyRequest } from "./policy-code/loader";
 import { createPolicyStore } from "./policy/policy-store";
 import type { ExecutionMode, PolicyInfo } from "./policy-code/types";
 import { buildPolicyExplainResponse } from "./policy-code/explain";
@@ -27,6 +28,9 @@ import { buildPolicyDriftReport, defaultDriftWindow } from "./policy-drift/compu
 import { createIntentApprovalStore } from "./intent-approvals/store";
 import type { IntentApprovalRecord } from "./intent-approvals/types";
 import { computePolicyImpactReport } from "./policy-impact/compute";
+import { evaluatePromotionGuardrails } from "./policy-promotion-guardrails/compute";
+import type { GuardrailDecision } from "./policy-promotion-guardrails/types";
+import { createPolicyPromotionStore } from "./policy-promotions/store";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -38,6 +42,7 @@ const lifecycleStore = createPolicyLifecycleStore();
 const lineageStore = createPolicyLineageStore();
 const outcomeStore = createPolicyOutcomeStore();
 const approvalStore = createIntentApprovalStore();
+const promotionStore = createPolicyPromotionStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -103,13 +108,28 @@ const policyImpactRequestSchema = z.object({
   limit: z.number().int().positive().optional()
 });
 
-const promoteRequestSchema = z.object({
+const legacyPromoteRequestSchema = z.object({
   runId: z.string().min(1),
   approvedBy: z.string().min(1),
   reason: z.string().min(1).optional(),
-  rationale: z.string().min(10),
-  acceptedRiskScore: z.number(),
-  notes: z.string().optional()
+  rationale: z.string().min(1).optional(),
+  acceptedRiskScore: z.number().optional(),
+  notes: z.string().optional(),
+  force: z.boolean().optional()
+});
+
+const guardrailPromoteRequestSchema = z.object({
+  policyHash: z.string().min(1),
+  reviewer: z.string().min(1),
+  rationale: z.string().min(1).optional(),
+  acceptedRisk: z.number().optional(),
+  force: z.boolean().optional()
+});
+
+const promoteRequestSchema = z.union([legacyPromoteRequestSchema, guardrailPromoteRequestSchema]);
+
+const promotionCheckQuerySchema = z.object({
+  policyHash: z.string().min(1)
 });
 
 const outcomeRequestSchema = z.object({
@@ -200,6 +220,71 @@ function buildDecisionSummary(decision: ReturnType<typeof policyEvaluator.evalua
     reasons: decision.reasons,
     matchedRuleIds: decision.matchedRules.map((rule) => rule.ruleId)
   };
+}
+
+function assertPolicyHashMatch(policyHash: string, snapshot: CandidatePolicySnapshot) {
+  if (snapshot.info.hash !== policyHash) {
+    throw new PolicySourceError("Resolved policy hash does not match the requested candidate hash.", 409);
+  }
+}
+
+function resolveCandidatePolicySnapshot(input: {
+  policyHash: string;
+  source?: "current" | "path" | "inline";
+  ref?: string | null;
+  inlineYaml?: string | null;
+}): CandidatePolicySnapshot {
+  const request: CandidatePolicyRequest | null = (() => {
+    if (input.source === "inline") {
+      if (!input.inlineYaml) {
+        throw new PolicySourceError("Inline policy YAML is required for this candidate.", 400);
+      }
+      return { source: "inline", yaml: input.inlineYaml, ref: input.ref ?? "inline" };
+    }
+    if (input.source === "path") {
+      if (!input.ref) {
+        throw new PolicySourceError("Policy path reference is required for this candidate.", 400);
+      }
+      return { source: "path", ref: input.ref };
+    }
+    if (input.source === "current") {
+      return { source: "current" };
+    }
+    return null;
+  })();
+
+  if (!request) {
+    const active = policyEvaluator.getPolicySnapshot();
+    if (active.policy && active.info.hash === input.policyHash) {
+      const snapshot: CandidatePolicySnapshot = {
+        policy: active.policy,
+        info: active.info,
+        source: "current",
+        ref: active.info.path
+      };
+      return snapshot;
+    }
+    throw new PolicySourceError("Policy hash is not registered for promotion.", 404);
+  }
+
+  const snapshot = loadPolicyFromSource(request);
+  assertPolicyHashMatch(input.policyHash, snapshot);
+  return snapshot;
+}
+
+async function evaluateGuardrailsForCandidate(policyHash: string, candidatePolicy: CandidatePolicySnapshot) {
+  const executionMode = (config.executionMode ?? "manual") as ExecutionMode;
+  const currentPolicy = loadPolicyFromSource({ source: "current" });
+  return evaluatePromotionGuardrails({
+    policyHash,
+    candidatePolicy,
+    currentPolicy,
+    outcomeStore,
+    replayStore,
+    lineageStore,
+    config: config.promotionGuardrails,
+    executionMode
+  });
 }
 
 async function evaluateAndStoreDecision(parsed: Intent, traceId: string) {
@@ -758,10 +843,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       throw error;
     }
 
+    const inlineYaml = candidateRequest.source === "inline" ? candidateRequest.yaml ?? null : null;
     lifecycleStore.registerDraft({
       hash: candidate.info.hash,
       source: candidate.source,
-      ref: candidate.ref ?? null
+      ref: candidate.ref ?? null,
+      inlineYaml
     });
 
     const filters = body.filters
@@ -784,7 +871,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     lifecycleStore.markSimulated({
       hash: run.candidate.hash,
       source: run.candidate.source,
-      ref: run.candidate.ref ?? null
+      ref: run.candidate.ref ?? null,
+      inlineYaml
     });
 
     return { traceId, run };
@@ -932,6 +1020,46 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     return { traceId, policyHash, lineage };
   });
 
+  app.get("/v1/policy/promote/check", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = promotionCheckQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid promotion check request", traceId };
+    }
+    const { policyHash } = parsed.data;
+    const status = lifecycleStore.getStatus(policyHash);
+    let candidatePolicy: CandidatePolicySnapshot;
+    try {
+      candidatePolicy = resolveCandidatePolicySnapshot({
+        policyHash,
+        source: status?.source,
+        ref: status?.ref ?? null,
+        inlineYaml: status?.inlineYaml ?? null
+      });
+    } catch (error) {
+      if (error instanceof PolicySourceError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+
+    let decision: GuardrailDecision;
+    try {
+      decision = await evaluateGuardrailsForCandidate(policyHash, candidatePolicy);
+    } catch (error) {
+      reply.code(500);
+      return { message: "Failed to evaluate promotion guardrails.", traceId };
+    }
+
+    if (!config.promotionGuardrails.enabled) {
+      decision = { ...decision, allowed: true, requiredAcceptance: false, reasons: [] };
+    }
+
+    return { traceId, ...decision };
+  });
+
   app.post("/v1/policy/promote", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
     const parsed = promoteRequestSchema.safeParse(request.body ?? {});
@@ -940,52 +1068,170 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Invalid promotion payload", traceId };
     }
     const body = parsed.data;
-    const run = await replayStore.getRun(body.runId);
-    if (!run) {
-      reply.code(404);
-      return { message: "Replay run not found", traceId };
+    const isLegacy = "runId" in body;
+    const now = new Date();
+    const force = Boolean(body.force);
+
+    let policyHash: string;
+    let reviewer: string;
+    let rationale: string | undefined;
+    let acceptedRisk: number | undefined;
+    let notes: string | undefined;
+    let runId: string;
+    let runSource: "replay" | "manual" = "manual";
+    let candidatePolicy: CandidatePolicySnapshot;
+    let impact;
+    let driftResults: Awaited<ReturnType<typeof replayStore.getResults>> = [];
+
+    if (isLegacy) {
+      const legacyBody = body;
+      const run = await replayStore.getRun(legacyBody.runId);
+      if (!run) {
+        reply.code(404);
+        return { message: "Replay run not found", traceId };
+      }
+      runId = run.id;
+      policyHash = run.candidatePolicyHash;
+      reviewer = legacyBody.approvedBy;
+      rationale = legacyBody.rationale ?? legacyBody.reason;
+      acceptedRisk = legacyBody.acceptedRiskScore;
+      notes = legacyBody.notes;
+      runSource = "replay";
+      driftResults = await replayStore.getResults(run.id, { limit: run.limit, offset: 0 });
+      impact = calculatePolicyImpact(driftResults, config.policyImpact);
+      if (impact.blocked) {
+        reply.code(409);
+        return { message: "Promotion blocked by impact guardrails.", traceId, impact };
+      }
+
+      const status = lifecycleStore.getStatus(run.candidatePolicyHash);
+      try {
+        candidatePolicy = resolveCandidatePolicySnapshot({
+          policyHash: run.candidatePolicyHash,
+          source: run.candidatePolicySource,
+          ref: run.candidatePolicyRef ?? null,
+          inlineYaml: status?.inlineYaml ?? null
+        });
+      } catch (error) {
+        if (error instanceof PolicySourceError) {
+          reply.code(error.statusCode);
+          return { message: error.message, traceId };
+        }
+        throw error;
+      }
+    } else {
+      const guardrailBody = body;
+      policyHash = guardrailBody.policyHash;
+      reviewer = guardrailBody.reviewer;
+      rationale = guardrailBody.rationale;
+      acceptedRisk = guardrailBody.acceptedRisk;
+      runId = "manual";
+      const status = lifecycleStore.getStatus(policyHash);
+      try {
+        candidatePolicy = resolveCandidatePolicySnapshot({
+          policyHash,
+          source: status?.source,
+          ref: status?.ref ?? null,
+          inlineYaml: status?.inlineYaml ?? null
+        });
+      } catch (error) {
+        if (error instanceof PolicySourceError) {
+          reply.code(error.statusCode);
+          return { message: error.message, traceId };
+        }
+        throw error;
+      }
+      const runs = await replayStore.listRuns({ policyHash, limit: 200 });
+      const latest = runs.length ? runs[runs.length - 1] : null;
+      if (latest) {
+        runId = latest.id;
+        runSource = "replay";
+        driftResults = await replayStore.getResults(latest.id, { limit: latest.limit, offset: 0 });
+      }
     }
-    const results = await replayStore.getResults(run.id, { limit: run.limit, offset: 0 });
-    const impact = calculatePolicyImpact(results, config.policyImpact);
-    if (impact.blocked) {
-      reply.code(409);
-      return { message: "Promotion blocked by impact guardrails.", traceId, impact };
+
+    if (config.promotionGuardrails.requireRationale) {
+      if (!rationale || rationale.trim().length < 10) {
+        reply.code(400);
+        return { message: "Promotion rationale is required.", traceId };
+      }
+    }
+
+    if (config.promotionGuardrails.requireAcceptedRisk) {
+      if (acceptedRisk === undefined || !Number.isFinite(acceptedRisk)) {
+        reply.code(400);
+        return { message: "Accepted risk score is required.", traceId };
+      }
+    }
+
+    let decision: GuardrailDecision | null = null;
+    if (config.promotionGuardrails.enabled) {
+      try {
+        decision = await evaluateGuardrailsForCandidate(policyHash, candidatePolicy);
+      } catch (error) {
+        reply.code(500);
+        return { message: "Failed to evaluate promotion guardrails.", traceId };
+      }
+      if (!decision.allowed && !force) {
+        reply.code(409);
+        return { message: "Promotion blocked by promotion guardrails.", traceId, decision };
+      }
+      if (decision.requiredAcceptance && (acceptedRisk === undefined || !Number.isFinite(acceptedRisk))) {
+        reply.code(400);
+        return { message: "Accepted risk score is required for promotion.", traceId, decision };
+      }
     }
 
     const approval = {
-      approvedBy: body.approvedBy,
-      approvedAt: new Date().toISOString(),
-      reason: body.reason ?? body.rationale,
-      rationale: body.rationale,
-      acceptedRiskScore: body.acceptedRiskScore,
-      notes: body.notes,
-      runId: run.id
+      approvedBy: reviewer,
+      approvedAt: now.toISOString(),
+      reason: rationale ?? "Manual promotion.",
+      rationale,
+      acceptedRiskScore: acceptedRisk,
+      notes,
+      runId
     };
 
     const parentPolicyHash = policyEvaluator.getPolicySnapshot().info.hash;
-    const drift = buildPolicyDriftSummary(results);
+    const drift =
+      driftResults.length > 0
+        ? buildPolicyDriftSummary(driftResults)
+        : { constraintsAdded: 0, constraintsRemoved: 0, severityDelta: 0, netRiskScoreChange: 0 };
     await lineageStore.createLineage({
-      policyHash: run.candidatePolicyHash,
-      parentPolicyHash: parentPolicyHash === run.candidatePolicyHash ? null : parentPolicyHash,
+      policyHash,
+      parentPolicyHash: parentPolicyHash === policyHash ? null : parentPolicyHash,
       promotedBy: approval.approvedBy,
       promotedAt: approval.approvedAt,
-      rationale: body.rationale,
-      acceptedRiskScore: body.acceptedRiskScore,
-      source: "replay",
+      rationale: rationale ?? "Manual promotion.",
+      acceptedRiskScore: acceptedRisk ?? 0,
+      source: runSource,
       drift
     });
 
     const promoted = lifecycleStore.promotePolicy({
-      hash: run.candidatePolicyHash,
-      source: run.candidatePolicySource,
-      ref: run.candidatePolicyRef ?? null,
+      hash: policyHash,
+      source: candidatePolicy.source,
+      ref: candidatePolicy.ref ?? null,
       approval
     });
+
+    if (decision) {
+      await promotionStore.createPromotion({
+        policyHash,
+        evaluatedAt: decision.snapshot.evaluatedAt,
+        reviewer,
+        rationale: rationale ?? "Manual promotion.",
+        acceptedRisk: acceptedRisk ?? null,
+        forced: force,
+        guardrailDecision: decision
+      });
+    }
 
     return {
       traceId,
       promoted,
-      impact
+      impact,
+      decision
     };
   });
 

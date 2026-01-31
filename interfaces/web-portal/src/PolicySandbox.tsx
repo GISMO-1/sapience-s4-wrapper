@@ -10,6 +10,7 @@ import {
   fetchIntentDecision,
   approveIntent,
   executeIntent,
+  fetchPromotionCheck,
   promotePolicy,
   runPolicyReplay,
   type PolicyOutcomeType,
@@ -17,6 +18,7 @@ import {
   type PolicyDriftResponse,
   type PolicyLineageResponse,
   type PolicyImpactSimulationReport,
+  type PromotionGuardrailDecision,
   type IntentDecisionResponse,
   type ReplayCandidateSource,
   type ReplayReport
@@ -85,6 +87,16 @@ export function PolicySandbox() {
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
   const [impactReport, setImpactReport] = useState<PolicyImpactSimulationReport | null>(null);
+  const [guardrailDecision, setGuardrailDecision] = useState<PromotionGuardrailDecision | null>(null);
+  const [guardrailCheckLoading, setGuardrailCheckLoading] = useState(false);
+  const [guardrailCheckError, setGuardrailCheckError] = useState("");
+  const [guardrailReviewer, setGuardrailReviewer] = useState("");
+  const [guardrailRationale, setGuardrailRationale] = useState("");
+  const [guardrailAcceptedRisk, setGuardrailAcceptedRisk] = useState("");
+  const [guardrailForce, setGuardrailForce] = useState(false);
+  const [guardrailPromotionStatus, setGuardrailPromotionStatus] = useState("");
+  const [guardrailPromotionError, setGuardrailPromotionError] = useState("");
+  const [guardrailPromotionLoading, setGuardrailPromotionLoading] = useState(false);
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -247,6 +259,55 @@ export function PolicySandbox() {
     }
   };
 
+  const guardrailCandidateHash =
+    report?.run.candidate.hash ?? (candidateSource === "current" ? lineage?.policyHash ?? "" : "");
+
+  const handlePromotionCheck = async () => {
+    if (!guardrailCandidateHash) {
+      return;
+    }
+    setGuardrailCheckLoading(true);
+    setGuardrailCheckError("");
+    setGuardrailDecision(null);
+    try {
+      const response = await fetchPromotionCheck(guardrailCandidateHash);
+      setGuardrailDecision(response);
+    } catch (err) {
+      setGuardrailCheckError((err as Error).message);
+    } finally {
+      setGuardrailCheckLoading(false);
+    }
+  };
+
+  const handleGuardrailPromote = async () => {
+    if (!guardrailCandidateHash) {
+      return;
+    }
+    setGuardrailPromotionLoading(true);
+    setGuardrailPromotionError("");
+    setGuardrailPromotionStatus("");
+    try {
+      await promotePolicy({
+        policyHash: guardrailCandidateHash,
+        reviewer: guardrailReviewer.trim(),
+        rationale: guardrailRationale.trim() || undefined,
+        acceptedRisk: guardrailAcceptedRisk ? Number(guardrailAcceptedRisk) : undefined,
+        force: guardrailForce
+      });
+      setGuardrailPromotionStatus("Policy promoted with guardrail review.");
+      try {
+        const response = await fetchPolicyLineageCurrent();
+        setLineage(response);
+      } catch (err) {
+        setLineageError((err as Error).message);
+      }
+    } catch (err) {
+      setGuardrailPromotionError((err as Error).message);
+    } finally {
+      setGuardrailPromotionLoading(false);
+    }
+  };
+
   const handlePromote = async () => {
     if (!report) {
       return;
@@ -387,6 +448,19 @@ export function PolicySandbox() {
   const impactedRows =
     impactReport?.rows.filter((row) => !(row.classifications.length === 1 && row.classifications[0] === "UNCHANGED")) ??
     [];
+  const guardrailAcceptedRiskValue = Number(guardrailAcceptedRisk);
+  const guardrailAcceptedRiskValid =
+    guardrailAcceptedRisk.trim().length > 0 && Number.isFinite(guardrailAcceptedRiskValue);
+  const guardrailRationaleValid = guardrailRationale.trim().length >= 10;
+  const guardrailRequiresAcceptance = guardrailDecision?.requiredAcceptance ?? false;
+  const guardrailNeedsForce = guardrailDecision ? !guardrailDecision.allowed : false;
+  const guardrailPromoteDisabled =
+    guardrailPromotionLoading ||
+    !guardrailDecision ||
+    !guardrailReviewer.trim() ||
+    !guardrailRationaleValid ||
+    (guardrailRequiresAcceptance && !guardrailAcceptedRiskValid) ||
+    (guardrailNeedsForce && !guardrailForce);
 
   const blastRadiusClass = (score: number) => {
     if (score >= 70) {
@@ -536,8 +610,8 @@ export function PolicySandbox() {
           </button>
           {impactError && <span className="sandbox-error">{impactError}</span>}
         </div>
-        {impactReport && (
-          <div className="sandbox-report">
+      {impactReport && (
+        <div className="sandbox-report">
             <div className="report-grid">
               <div>
                 <strong>Blast radius</strong>
@@ -603,6 +677,128 @@ export function PolicySandbox() {
             )}
           </div>
         )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Promotion Guardrails</h3>
+        <p>Evaluate deterministic promotion checks before activating a candidate policy.</p>
+        <div className="sandbox-section">
+          <div className="sandbox-row">
+            <strong>Candidate hash</strong>
+            <span>{guardrailCandidateHash || "Run a replay or select the current policy to resolve a hash."}</span>
+          </div>
+          <div className="sandbox-actions">
+            <button type="button" onClick={handlePromotionCheck} disabled={!guardrailCandidateHash || guardrailCheckLoading}>
+              {guardrailCheckLoading ? "Checking..." : "Check Promotion"}
+            </button>
+            {guardrailCheckError && <span className="sandbox-error">{guardrailCheckError}</span>}
+          </div>
+        </div>
+
+        {guardrailDecision && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Status</strong>
+                <div className={guardrailDecision.allowed ? "impact-ok" : "impact-blocked"}>
+                  {guardrailDecision.allowed ? "Allowed" : "Blocked"}
+                </div>
+              </div>
+              <div>
+                <strong>Health</strong>
+                <div>{guardrailDecision.snapshot.drift.health.state}</div>
+              </div>
+              <div>
+                <strong>Blast radius</strong>
+                <div>{guardrailDecision.snapshot.impact.blastRadiusScore}</div>
+              </div>
+              <div>
+                <strong>Impacted intents</strong>
+                <div>{guardrailDecision.snapshot.impact.impactedIntents}</div>
+              </div>
+              <div>
+                <strong>Quality score</strong>
+                <div>{guardrailDecision.snapshot.quality.score.toFixed(2)}</div>
+              </div>
+              <div>
+                <strong>Evaluated</strong>
+                <div>{new Date(guardrailDecision.snapshot.evaluatedAt).toLocaleString()}</div>
+              </div>
+            </div>
+            <div>
+              <strong>Reasons</strong>
+              {guardrailDecision.reasons.length ? (
+                <ul>
+                  {guardrailDecision.reasons.map((reason) => (
+                    <li key={reason.code}>
+                      {reason.code}: {reason.message} ({reason.metric} / {reason.threshold})
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div>No guardrail issues detected.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="sandbox-card sandbox-approval">
+          <h4>Promote with guardrails</h4>
+          <div className="sandbox-row">
+            <label>
+              Reviewer
+              <input
+                type="text"
+                value={guardrailReviewer}
+                onChange={(event) => setGuardrailReviewer(event.target.value)}
+                placeholder="Reviewer name"
+              />
+            </label>
+            <label>
+              Rationale
+              <input
+                type="text"
+                value={guardrailRationale}
+                onChange={(event) => setGuardrailRationale(event.target.value)}
+                placeholder="Explain promotion acceptance"
+              />
+            </label>
+            <label>
+              Accepted risk
+              <input
+                type="number"
+                min={0}
+                value={guardrailAcceptedRisk}
+                onChange={(event) => setGuardrailAcceptedRisk(event.target.value)}
+                placeholder="e.g. 12"
+              />
+            </label>
+          </div>
+          {guardrailRequiresAcceptance && (
+            <div className="sandbox-row">
+              <span>Accepted risk is required for this promotion.</span>
+            </div>
+          )}
+          {guardrailNeedsForce && (
+            <div className="sandbox-row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={guardrailForce}
+                  onChange={(event) => setGuardrailForce(event.target.checked)}
+                />
+                Force promote (override guardrail block)
+              </label>
+            </div>
+          )}
+          <div className="sandbox-actions">
+            <button type="button" onClick={handleGuardrailPromote} disabled={guardrailPromoteDisabled}>
+              {guardrailPromotionLoading ? "Promoting..." : "Promote"}
+            </button>
+            {guardrailPromotionStatus && <span className="sandbox-success">{guardrailPromotionStatus}</span>}
+            {guardrailPromotionError && <span className="sandbox-error">{guardrailPromotionError}</span>}
+          </div>
+        </div>
       </div>
 
       <div className="sandbox-card">

@@ -200,7 +200,7 @@ test("promotion button remains disabled when impact guardrails block promotion",
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
   render(<PolicySandbox />);
-  fireEvent.click(screen.getByRole("button", { name: /run replay/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /run replay/i }));
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
@@ -228,7 +228,7 @@ test("promotion button enables after approval details when impact is within thre
   vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
 
   render(<PolicySandbox />);
-  fireEvent.click(screen.getByRole("button", { name: /run replay/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /run replay/i }));
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
@@ -337,17 +337,17 @@ test("policy impact simulation renders blast radius summary", async () => {
 
   render(<PolicySandbox />);
 
-  fireEvent.change(screen.getByLabelText(/Candidate policy/i), {
+  fireEvent.change(await screen.findByLabelText(/Candidate policy/i), {
     target: { value: "version: \"v1\"\n" }
   });
-  fireEvent.change(screen.getByLabelText(/Since/i), {
+  fireEvent.change(await screen.findByLabelText(/Since/i), {
     target: { value: "2024-02-01T00:00" }
   });
-  fireEvent.change(screen.getByLabelText(/Until/i), {
+  fireEvent.change(await screen.findByLabelText(/Until/i), {
     target: { value: "2024-02-02T00:00" }
   });
 
-  fireEvent.click(screen.getByRole("button", { name: /Run simulation/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /Run simulation/i }));
 
   await waitFor(() => {
     expect(fetchPolicyImpactReport).toHaveBeenCalledWith(
@@ -376,10 +376,9 @@ test("promotion guardrail check renders reasons", async () => {
 
   render(<PolicySandbox />);
 
-  await waitFor(() => {
-    expect(screen.getAllByText("policy-1").length).toBeGreaterThan(0);
-  });
-  fireEvent.click(screen.getByRole("button", { name: /Check Promotion/i }));
+  const policyEntries = await screen.findAllByText("policy-1");
+  expect(policyEntries.length).toBeGreaterThan(0);
+  fireEvent.click(await screen.findByRole("button", { name: /Check Promotion/i }));
 
   await waitFor(() => {
     expect(fetchPromotionCheck).toHaveBeenCalledWith("policy-1");
@@ -402,10 +401,9 @@ test("blocked promotion requires force checkbox to enable promotion", async () =
 
   render(<PolicySandbox />);
 
-  await waitFor(() => {
-    expect(screen.getAllByText("policy-1").length).toBeGreaterThan(0);
-  });
-  fireEvent.click(screen.getByRole("button", { name: /Check Promotion/i }));
+  const policyEntries = await screen.findAllByText("policy-1");
+  expect(policyEntries.length).toBeGreaterThan(0);
+  fireEvent.click(await screen.findByRole("button", { name: /Check Promotion/i }));
   await screen.findByText(/BLAST_RADIUS_EXCEEDED/i);
 
   fireEvent.change(screen.getByLabelText(/Reviewer/i), { target: { value: "Reviewer" } });

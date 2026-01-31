@@ -6,6 +6,7 @@ import {
   fetchPolicyTimeline,
   fetchPolicyQuality,
   fetchPolicyDrift,
+  fetchPolicyVerify,
   recordPolicyOutcome,
   fetchPolicyImpactReport,
   fetchIntentDecision,
@@ -17,6 +18,7 @@ import {
   type PolicyOutcomeType,
   type PolicyQualityResponse,
   type PolicyDriftResponse,
+  type PolicyVerificationResponse,
   type PolicyLineageResponse,
   type PolicyLifecycleTimeline,
   type PolicyImpactSimulationReport,
@@ -81,6 +83,12 @@ export function PolicySandbox() {
   const [policyDrift, setPolicyDrift] = useState<PolicyDriftResponse | null>(null);
   const [policyDriftError, setPolicyDriftError] = useState("");
   const [policyDriftLoading, setPolicyDriftLoading] = useState(false);
+  const [verificationPolicyHash, setVerificationPolicyHash] = useState("");
+  const [verificationSince, setVerificationSince] = useState("");
+  const [verificationUntil, setVerificationUntil] = useState("");
+  const [verificationResult, setVerificationResult] = useState<PolicyVerificationResponse | null>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
   const [impactPolicyYaml, setImpactPolicyYaml] = useState(DEFAULT_INLINE);
   const [impactSince, setImpactSince] = useState(() => {
     const date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -114,6 +122,12 @@ export function PolicySandbox() {
     };
     loadLineage();
   }, []);
+
+  useEffect(() => {
+    if (lineage?.policyHash && !verificationPolicyHash) {
+      setVerificationPolicyHash(lineage.policyHash);
+    }
+  }, [lineage?.policyHash, verificationPolicyHash]);
 
   useEffect(() => {
     if (!lineage?.policyHash) {
@@ -401,6 +415,37 @@ export function PolicySandbox() {
       }
     } catch (err) {
       setOutcomeError((err as Error).message);
+    }
+  };
+
+  const handleVerification = async () => {
+    const policyHash = verificationPolicyHash.trim();
+    if (!policyHash) {
+      setVerificationError("Policy hash is required.");
+      return;
+    }
+    setVerificationLoading(true);
+    setVerificationError("");
+    setVerificationResult(null);
+    try {
+      const sinceDate = verificationSince ? new Date(verificationSince) : null;
+      const untilDate = verificationUntil ? new Date(verificationUntil) : null;
+      if (sinceDate && Number.isNaN(sinceDate.getTime())) {
+        throw new Error("Invalid since timestamp.");
+      }
+      if (untilDate && Number.isNaN(untilDate.getTime())) {
+        throw new Error("Invalid until timestamp.");
+      }
+      const response = await fetchPolicyVerify({
+        policyHash,
+        since: sinceDate ? sinceDate.toISOString() : undefined,
+        until: untilDate ? untilDate.toISOString() : undefined
+      });
+      setVerificationResult(response);
+    } catch (err) {
+      setVerificationError((err as Error).message);
+    } finally {
+      setVerificationLoading(false);
     }
   };
 
@@ -1043,6 +1088,92 @@ export function PolicySandbox() {
               <strong>Quality score</strong>
               <div>{policyQuality.metrics.qualityScore.toFixed(1)}</div>
             </div>
+          </div>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Determinism / Integrity</h3>
+        <p>Verify that derived policy state is reproducible from the ordered event log.</p>
+        <div className="sandbox-row">
+          <label>
+            Policy hash
+            <input
+              type="text"
+              value={verificationPolicyHash}
+              onChange={(event) => setVerificationPolicyHash(event.target.value)}
+              placeholder="policy hash"
+            />
+          </label>
+          <label>
+            Since
+            <input
+              type="datetime-local"
+              value={verificationSince}
+              onChange={(event) => setVerificationSince(event.target.value)}
+            />
+          </label>
+          <label>
+            Until
+            <input
+              type="datetime-local"
+              value={verificationUntil}
+              onChange={(event) => setVerificationUntil(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="sandbox-actions">
+          <button
+            type="button"
+            onClick={handleVerification}
+            disabled={verificationLoading || !verificationPolicyHash.trim()}
+          >
+            {verificationLoading ? "Verifying..." : "Verify"}
+          </button>
+          {verificationError && <span className="sandbox-error">{verificationError}</span>}
+        </div>
+        {verificationResult && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Status</strong>
+                <div
+                  className={
+                    verificationResult.verified
+                      ? "integrity-status integrity-status-verified"
+                      : "integrity-status integrity-status-inconsistent"
+                  }
+                >
+                  {verificationResult.verified ? "VERIFIED" : "INCONSISTENT"}
+                </div>
+              </div>
+              <div>
+                <strong>Event count</strong>
+                <div>{verificationResult.eventCount}</div>
+              </div>
+              <div>
+                <strong>Last event hash</strong>
+                <div>{verificationResult.lastEventHash ?? "n/a"}</div>
+              </div>
+            </div>
+            {!verificationResult.verified && verificationResult.mismatches.length > 0 && (
+              <div className="sandbox-section">
+                <strong>First mismatch</strong>
+                <div className="mismatch-summary">
+                  {verificationResult.mismatches[0].field}
+                </div>
+                <div className="mismatch-detail">
+                  <div>
+                    <strong>Expected</strong>
+                    <pre>{JSON.stringify(verificationResult.mismatches[0].expected, null, 2)}</pre>
+                  </div>
+                  <div>
+                    <strong>Actual</strong>
+                    <pre>{JSON.stringify(verificationResult.mismatches[0].actual, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

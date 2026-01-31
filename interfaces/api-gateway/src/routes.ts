@@ -34,6 +34,8 @@ import { createPolicyGuardrailCheckStore } from "./policy-promotion-guardrails/s
 import { createPolicyPromotionStore } from "./policy-promotions/store";
 import { createPolicyApprovalStore } from "./policy-approvals/store";
 import { buildPolicyLifecycleTimeline } from "./policy-lifecycle/timeline";
+import { buildPolicyEventLog } from "./policy-events/projector";
+import { verifyPolicyDeterminism } from "./policy-verifier/verify";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -184,6 +186,23 @@ const policyDriftQuerySchema = z.object({
 const replayReportOutcomeQuerySchema = z.object({
   outcomesSince: z.string().datetime().optional(),
   outcomesUntil: z.string().datetime().optional()
+});
+
+const policyEventsQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.string().optional()
+});
+
+const policyVerifyQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  baselineSince: z.string().datetime().optional(),
+  baselineUntil: z.string().datetime().optional(),
+  qualitySince: z.string().datetime().optional(),
+  qualityUntil: z.string().datetime().optional()
 });
 
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
@@ -834,6 +853,45 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return { traceId, report };
+  });
+
+  app.get("/v1/policy/events", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = policyEventsQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid policy events request", traceId };
+    }
+    const { policyHash, since, until, limit } = parsed.data;
+    const max = limit && Number.isFinite(Number(limit)) ? Number(limit) : undefined;
+    const events = await buildPolicyEventLog({
+      policyHash,
+      since: since ? new Date(since) : undefined,
+      until: until ? new Date(until) : undefined,
+      limit: max
+    });
+    return { traceId, policyHash, events };
+  });
+
+  app.get("/v1/policy/verify", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = policyVerifyQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid policy verification request", traceId };
+    }
+    const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const result = await verifyPolicyDeterminism({
+      policyHash: parsed.data.policyHash,
+      since: parsed.data.since ? new Date(parsed.data.since) : undefined,
+      until: parsed.data.until ? new Date(parsed.data.until) : undefined,
+      baselineSince: parsed.data.baselineSince ? new Date(parsed.data.baselineSince) : undefined,
+      baselineUntil: parsed.data.baselineUntil ? new Date(parsed.data.baselineUntil) : undefined,
+      qualitySince: parsed.data.qualitySince ? new Date(parsed.data.qualitySince) : undefined,
+      qualityUntil: parsed.data.qualityUntil ? new Date(parsed.data.qualityUntil) : undefined,
+      activePolicyHash: activeSnapshot.info.hash
+    });
+    return { traceId, policyHash: parsed.data.policyHash, ...result };
   });
 
   app.post("/v1/policy/replay", async (request, reply) => {

@@ -574,7 +574,7 @@ export function PolicySandbox() {
   };
 
   return (
-    <section className="policy-sandbox">
+    <section className="policy-sandbox" id="policy-sandbox">
       <h2>Policy Sandbox</h2>
       <p>Run policy replay against historical intents and inspect impact summaries.</p>
       <div className="sandbox-card">

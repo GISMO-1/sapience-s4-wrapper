@@ -206,6 +206,157 @@ button:disabled {
   border-top: 1px solid #e3e7ef;
 }
 
+.policy-packs {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e3e7ef;
+}
+
+.policy-packs-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #d0d7e2;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.policy-packs-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.policy-packs-status {
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.policy-packs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.policy-packs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.policy-packs-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.policy-packs-item.active {
+  border-color: #2563eb;
+  background: #e0ecff;
+  color: #1d4ed8;
+}
+
+.policy-packs-version {
+  font-size: 0.85rem;
+  color: inherit;
+}
+
+.policy-packs-muted {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.policy-packs-detail ul {
+  padding-left: 1.2rem;
+  margin: 0.75rem 0 0;
+}
+
+.policy-packs-description {
+  margin: 0 0 0.75rem;
+  color: #334155;
+}
+
+.policy-packs-notes pre {
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  white-space: pre-wrap;
+}
+
+.policy-packs-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.policy-packs-link {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.policy-packs-results {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.policy-packs-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.policy-packs-health {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.policy-packs-allowed {
+  color: #166534;
+  font-weight: 700;
+}
+
+.policy-packs-blocked {
+  color: #991b1b;
+  font-weight: 700;
+}
+
+.policy-packs-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d0d7e2;
+}
+
+.policy-packs-table th,
+.policy-packs-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e3e7ef;
+}
+
+.policy-packs-table th {
+  background: #f3f6fb;
+}
+
 .provenance-card {
   background: white;
   border-radius: 12px;

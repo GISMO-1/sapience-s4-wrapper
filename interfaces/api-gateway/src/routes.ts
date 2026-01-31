@@ -37,6 +37,8 @@ import { buildPolicyLifecycleTimeline } from "./policy-lifecycle/timeline";
 import { buildPolicyEventLog } from "./policy-events/projector";
 import { verifyPolicyDeterminism } from "./policy-verifier/verify";
 import { buildPolicyProvenanceMarkdown, buildPolicyProvenanceReport } from "./policy-provenance/build";
+import { createPolicyPackRegistry, PolicyPackError } from "./policy-packs/registry";
+import { installPolicyPack } from "./policy-packs/install";
 import { logger } from "./logger";
 
 const intentStore = createIntentStore();
@@ -51,6 +53,7 @@ const approvalStore = createIntentApprovalStore();
 const promotionStore = createPolicyPromotionStore();
 const guardrailCheckStore = createPolicyGuardrailCheckStore();
 const policyApprovalStore = createPolicyApprovalStore();
+const policyPackRegistry = createPolicyPackRegistry();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -204,6 +207,10 @@ const policyVerifyQuerySchema = z.object({
   baselineUntil: z.string().datetime().optional(),
   qualitySince: z.string().datetime().optional(),
   qualityUntil: z.string().datetime().optional()
+});
+
+const policyPackDownloadQuerySchema = z.object({
+  format: z.enum(["json"]).default("json")
 });
 
 const policyProvenanceQuerySchema = z.object({
@@ -926,6 +933,89 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { traceId, report };
+  });
+
+  app.get("/v1/policy/packs", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    try {
+      const packs = policyPackRegistry.listPacks();
+      return { traceId, packs };
+    } catch (error) {
+      if (error instanceof PolicyPackError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+  });
+
+  app.get("/v1/policy/packs/:name", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const name = String((request.params as { name: string }).name);
+    try {
+      const pack = policyPackRegistry.getPack(name);
+      return { traceId, pack };
+    } catch (error) {
+      if (error instanceof PolicyPackError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+  });
+
+  app.get("/v1/policy/packs/:name/download", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const name = String((request.params as { name: string }).name);
+    const parsed = policyPackDownloadQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid download format.", traceId };
+    }
+    try {
+      const download = policyPackRegistry.downloadPack(name);
+      if (parsed.data.format === "json") {
+        reply.type("application/json; charset=utf-8");
+        reply.header("content-disposition", `attachment; filename=\"${download.filename}\"`);
+        return download.payload;
+      }
+      reply.code(400);
+      return { message: "Unsupported download format.", traceId };
+    } catch (error) {
+      if (error instanceof PolicyPackError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
+  });
+
+  app.post("/v1/policy/packs/:name/install", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const name = String((request.params as { name: string }).name);
+    try {
+      const result = await installPolicyPack({
+        name,
+        registry: policyPackRegistry,
+        lifecycleStore,
+        replayStore,
+        outcomeStore,
+        lineageStore,
+        guardrailConfig: config.promotionGuardrails,
+        executionMode: (config.executionMode ?? "manual") as ExecutionMode
+      });
+      return { traceId, bundle: result.bundle };
+    } catch (error) {
+      if (error instanceof PolicyPackError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      if (error instanceof PolicySourceError) {
+        reply.code(error.statusCode);
+        return { message: error.message, traceId };
+      }
+      throw error;
+    }
   });
 
   app.post("/v1/policy/replay", async (request, reply) => {

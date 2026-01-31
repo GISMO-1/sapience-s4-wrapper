@@ -595,6 +595,47 @@ export async function fetchPolicyProvenanceMarkdown(policyHash: string): Promise
   return response.text();
 }
 
+export type PolicyPackSummary = {
+  name: string;
+  version: string;
+  description: string;
+  createdAt: string;
+  author: string;
+  policyHash: string;
+  packHash: string;
+  signed: boolean;
+};
+
+export type PolicyPackDetails = PolicyPackSummary & {
+  policy: Record<string, unknown>;
+  notes?: string;
+  signatureFile?: Record<string, unknown> | null;
+  signature?: { algorithm: string; signature: string } | null;
+};
+
+export type PolicyPackInstallBundle = {
+  pack: PolicyPackSummary;
+  candidate: { policyHash: string; source: "path"; ref: string };
+  hashes: { policyHash: string; packHash: string; candidatePolicyHash: string };
+  reports: {
+    impact: PolicyImpactSimulationReport;
+    drift: PolicyDriftResponse["report"];
+    guardrail: PromotionGuardrailDecision;
+  };
+};
+
+export async function fetchPolicyPacks(): Promise<{ traceId: string; packs: PolicyPackSummary[] }> {
+  return fetchJson(buildUrl("/v1/policy/packs"));
+}
+
+export async function fetchPolicyPack(name: string): Promise<{ traceId: string; pack: PolicyPackDetails }> {
+  return fetchJson(buildUrl(`/v1/policy/packs/${encodeURIComponent(name)}`));
+}
+
+export async function installPolicyPack(name: string): Promise<{ traceId: string; bundle: PolicyPackInstallBundle }> {
+  return fetchJson(buildUrl(`/v1/policy/packs/${encodeURIComponent(name)}/install`), { method: "POST" });
+}
+
 export type PolicyEvent = {
   eventId: string;
   occurredAt: string;

@@ -3,6 +3,7 @@ import { sendIntent } from "./api";
 import { PolicySandbox } from "./PolicySandbox";
 import { TraceViewer } from "./TraceViewer";
 import { PolicyProvenancePanel } from "./PolicyProvenancePanel";
+import { PolicyPacksPanel } from "./PolicyPacksPanel";
 
 export function App() {
   const [input, setInput] = useState("");
@@ -50,6 +51,7 @@ export function App() {
       <PolicySandbox />
       <TraceViewer />
       <PolicyProvenancePanel />
+      <PolicyPacksPanel />
     </div>
   );
 }

@@ -8,4 +8,5 @@ test("renders heading", () => {
   expect(screen.getByText(/Sapience Portal/i)).toBeInTheDocument();
   expect(screen.getByText(/Policy Sandbox/i)).toBeInTheDocument();
   expect(screen.getByText(/Policy Provenance/i)).toBeInTheDocument();
+  expect(screen.getByText(/Policy Packs/i)).toBeInTheDocument();
 });

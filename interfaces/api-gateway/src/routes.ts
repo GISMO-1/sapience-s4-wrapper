@@ -38,6 +38,7 @@ import { buildPolicyLifecycleTimeline } from "./policy-lifecycle/timeline";
 import { buildPolicyEventLog } from "./policy-events/projector";
 import { verifyPolicyDeterminism } from "./policy-verifier/verify";
 import { buildPolicyProvenanceMarkdown, buildPolicyProvenanceReport } from "./policy-provenance/build";
+import { buildTrustReport, buildTrustReportMarkdown } from "./trust-report/build";
 import { createPolicyPackRegistry, PolicyPackError } from "./policy-packs/registry";
 import { installPolicyPack } from "./policy-packs/install";
 import { createPolicyRollbackStore } from "./policy-rollback/store";
@@ -243,6 +244,10 @@ const policyProvenanceQuerySchema = z.object({
   counterfactualUntil: z.string().datetime().optional(),
   counterfactualCompareToPolicyHash: z.string().min(1).optional(),
   counterfactualLimit: z.string().optional()
+});
+
+const trustReportQuerySchema = z.object({
+  format: z.enum(["md"]).optional()
 });
 
 const decisionFormatQuerySchema = z.object({
@@ -1014,6 +1019,37 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (parsed.data.format === "md") {
       reply.type("text/markdown; charset=utf-8");
       return buildPolicyProvenanceMarkdown(report);
+    }
+
+    return { traceId, report };
+  });
+
+  app.get("/v1/system/trust", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const parsed = trustReportQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid trust report request", traceId };
+    }
+
+    const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const report = await buildTrustReport({
+      policyHash: activeSnapshot.info.hash,
+      activePolicyHash: activeSnapshot.info.hash,
+      lifecycleStore,
+      lineageStore,
+      replayStore,
+      guardrailCheckStore,
+      approvalStore: policyApprovalStore,
+      outcomeStore,
+      rollbackStore,
+      decisionRationaleStore,
+      policyInfo: activeSnapshot.info
+    });
+
+    if (parsed.data.format === "md") {
+      reply.type("text/markdown; charset=utf-8");
+      return buildTrustReportMarkdown(report);
     }
 
     return { traceId, report };

@@ -44,7 +44,9 @@ services:
       start_period: 10s
 
   integration-service:
-    build: ../services/integration-service
+    build:
+      context: ..
+      dockerfile: services/integration-service/Dockerfile
     environment:
       PORT: 3004
       SERVICE_NAME: integration-service
@@ -74,7 +76,9 @@ services:
       start_period: 15s
 
   procurement-service:
-    build: ../services/procurement-service
+    build:
+      context: ..
+      dockerfile: services/procurement-service/Dockerfile
     environment:
       PORT: 3001
       SERVICE_NAME: procurement-service
@@ -104,7 +108,9 @@ services:
       start_period: 15s
 
   supplychain-service:
-    build: ../services/supplychain-service
+    build:
+      context: ..
+      dockerfile: services/supplychain-service/Dockerfile
     environment:
       PORT: 3002
       SERVICE_NAME: supplychain-service
@@ -134,7 +140,9 @@ services:
       start_period: 15s
 
   finance-service:
-    build: ../services/finance-service
+    build:
+      context: ..
+      dockerfile: services/finance-service/Dockerfile
     environment:
       PORT: 3003
       SERVICE_NAME: finance-service
@@ -164,7 +172,9 @@ services:
       start_period: 15s
 
   orchestration-service:
-    build: ../services/orchestration-service
+    build:
+      context: ..
+      dockerfile: services/orchestration-service/Dockerfile
     environment:
       PORT: 3005
       SERVICE_NAME: orchestration-service
@@ -194,7 +204,9 @@ services:
       start_period: 15s
 
   ai-service:
-    build: ../services/ai-service
+    build:
+      context: ..
+      dockerfile: services/ai-service/Dockerfile
     environment:
       PORT: 8000
       SERVICE_NAME: ai-service
@@ -224,7 +236,9 @@ services:
       start_period: 20s
 
   api-gateway:
-    build: ../interfaces/api-gateway
+    build:
+      context: ..
+      dockerfile: interfaces/api-gateway/Dockerfile
     environment:
       PORT: 8080
       SERVICE_NAME: api-gateway
@@ -258,7 +272,9 @@ services:
       start_period: 15s
 
   web-portal:
-    build: ../interfaces/web-portal
+    build:
+      context: ..
+      dockerfile: interfaces/web-portal/Dockerfile
     environment:
       VITE_API_BASE: http://api-gateway:8080
     depends_on:

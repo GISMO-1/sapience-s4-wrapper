@@ -1,17 +1,17 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml* ./
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY interfaces/web-portal ./interfaces/web-portal
+WORKDIR /app/interfaces/web-portal
 RUN pnpm install --frozen-lockfile=false
-COPY tsconfig.json vite.config.ts index.html ./
-COPY src ./src
 RUN pnpm run build
 
 FROM node:20-alpine
 WORKDIR /app
 RUN corepack enable
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY package.json ./
+COPY --from=builder /app/interfaces/web-portal/dist ./dist
+COPY --from=builder /app/interfaces/web-portal/node_modules ./node_modules
+COPY --from=builder /app/interfaces/web-portal/package.json ./
 EXPOSE 5173
 CMD ["pnpm", "preview", "--host", "0.0.0.0", "--port", "5173"]

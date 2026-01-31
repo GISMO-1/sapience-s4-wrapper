@@ -4,6 +4,7 @@ RUN corepack enable
 COPY interfaces/api-gateway/package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile=false
 COPY interfaces/api-gateway/tsconfig.json tsconfig.base.json ./
+COPY tsconfig.base.json /tsconfig.base.json
 COPY interfaces/api-gateway/src ./src
 RUN pnpm run build
 

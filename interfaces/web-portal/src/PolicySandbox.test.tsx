@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { expect, test, vi } from "vitest";
 import { PolicySandbox } from "./PolicySandbox";
@@ -104,7 +104,9 @@ test("promotion button remains disabled when impact guardrails block promotion",
   fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
-  expect(screen.getByRole("button", { name: /promote policy/i })).toBeDisabled();
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /promote policy/i })).toBeDisabled();
+  });
 });
 
 test("promotion button enables after approval details when impact is within thresholds", async () => {
@@ -127,7 +129,9 @@ test("promotion button enables after approval details when impact is within thre
   fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
-  expect(screen.getByRole("button", { name: /promote policy/i })).toBeEnabled();
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /promote policy/i })).toBeEnabled();
+  });
 });
 
 test("policy lineage renders without crashing", async () => {
@@ -180,10 +184,12 @@ test("policy sandbox renders outcome form and submits payload", async () => {
   fireEvent.change(screen.getByLabelText(/Severity/i), { target: { value: "3" } });
   fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
 
-  expect(recordPolicyOutcome).toHaveBeenCalledWith(
-    expect.objectContaining({
-      traceId: "trace-55",
-      severity: 3
-    })
-  );
+  await waitFor(() => {
+    expect(recordPolicyOutcome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        traceId: "trace-55",
+        severity: 3
+      })
+    );
+  });
 });

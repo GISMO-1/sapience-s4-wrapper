@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
 COPY tsconfig.base.json ./tsconfig.base.json
+COPY tsconfig.base.json /tsconfig.base.json
 COPY interfaces/web-portal ./interfaces/web-portal
 WORKDIR /app/interfaces/web-portal
 RUN pnpm install --frozen-lockfile=false

@@ -25,6 +25,7 @@ import { createPolicyOutcomeStore } from "./policy-outcomes/store";
 import type { PolicyOutcomeRecord } from "./policy-outcomes/types";
 import { calculatePolicyQuality } from "./policy-quality/score";
 import { buildPolicyDriftReport, defaultDriftWindow } from "./policy-drift/compute";
+import { buildPolicyCounterfactualReport } from "./policy-counterfactual/compute";
 import { createIntentApprovalStore } from "./intent-approvals/store";
 import type { IntentApprovalRecord } from "./intent-approvals/types";
 import { computePolicyImpactReport } from "./policy-impact/compute";
@@ -217,9 +218,28 @@ const policyPackDownloadQuerySchema = z.object({
   format: z.enum(["json"]).default("json")
 });
 
+const policyCounterfactualRequestSchema = z.object({
+  policyHash: z.string().min(1),
+  compareToPolicyHash: z.string().min(1).optional(),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.number().int().positive().optional()
+});
+
+const policyBlastRadiusQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.string().optional()
+});
+
 const policyProvenanceQuerySchema = z.object({
   policyHash: z.string().min(1),
-  format: z.enum(["md"]).optional()
+  format: z.enum(["md"]).optional(),
+  counterfactualSince: z.string().datetime().optional(),
+  counterfactualUntil: z.string().datetime().optional(),
+  counterfactualCompareToPolicyHash: z.string().min(1).optional(),
+  counterfactualLimit: z.string().optional()
 });
 
 const rollbackRequestSchema = z.object({
@@ -937,6 +957,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Invalid policy provenance request", traceId };
     }
     const activeSnapshot = policyEvaluator.getPolicySnapshot();
+    const counterfactualLimit =
+      parsed.data.counterfactualLimit && Number.isFinite(Number(parsed.data.counterfactualLimit))
+        ? Number(parsed.data.counterfactualLimit)
+        : undefined;
+    const counterfactualRequested =
+      Boolean(parsed.data.counterfactualSince) ||
+      Boolean(parsed.data.counterfactualUntil) ||
+      Boolean(parsed.data.counterfactualCompareToPolicyHash);
     const report = await buildPolicyProvenanceReport({
       policyHash: parsed.data.policyHash,
       activePolicyHash: activeSnapshot.info.hash,
@@ -947,7 +975,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       approvalStore: policyApprovalStore,
       outcomeStore,
       rollbackStore,
-      policyInfo: activeSnapshot.info
+      policyInfo: activeSnapshot.info,
+      counterfactual: counterfactualRequested
+        ? {
+            policyHash: parsed.data.policyHash,
+            compareToPolicyHash: parsed.data.counterfactualCompareToPolicyHash,
+            since: parsed.data.counterfactualSince,
+            until: parsed.data.counterfactualUntil,
+            limit: counterfactualLimit
+          }
+        : undefined
     });
 
     if (parsed.data.format === "md") {
@@ -1129,6 +1166,40 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       executionMode
     });
 
+    return { traceId, ...report };
+  });
+
+  app.post("/v1/policy/counterfactual", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const body = policyCounterfactualRequestSchema.parse(request.body ?? {});
+    const report = await buildPolicyCounterfactualReport({
+      ...body,
+      outcomeStore,
+      replayStore,
+      lifecycleStore,
+      lineageStore
+    });
+    return { traceId, ...report };
+  });
+
+  app.get("/v1/policy/blast-radius", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const query = policyBlastRadiusQuerySchema.safeParse(request.query ?? {});
+    if (!query.success) {
+      reply.code(400);
+      return { message: "Invalid blast radius request", traceId };
+    }
+    const limit = query.data.limit && Number.isFinite(Number(query.data.limit)) ? Number(query.data.limit) : undefined;
+    const report = await buildPolicyCounterfactualReport({
+      policyHash: query.data.policyHash,
+      since: query.data.since,
+      until: query.data.until,
+      limit,
+      outcomeStore,
+      replayStore,
+      lifecycleStore,
+      lineageStore
+    });
     return { traceId, ...report };
   });
 

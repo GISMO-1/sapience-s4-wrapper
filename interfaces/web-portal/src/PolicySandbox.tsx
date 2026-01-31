@@ -12,6 +12,8 @@ import {
   fetchIntentDecision,
   approveIntent,
   executeIntent,
+  computeCounterfactual,
+  fetchBlastRadius,
   fetchPromotionCheck,
   promotePolicy,
   rollbackPolicy,
@@ -30,7 +32,8 @@ import {
   type ReplayReport,
   type RollbackDecision,
   type RollbackEvent,
-  type ReconcileReport
+  type ReconcileReport,
+  type BlastRadiusReport
 } from "./api";
 
 const DEFAULT_INLINE = "version: \"v1\"\n";
@@ -133,6 +136,17 @@ export function PolicySandbox() {
   const [reconcileReport, setReconcileReport] = useState<ReconcileReport | null>(null);
   const [reconcileError, setReconcileError] = useState("");
   const [reconcileLoading, setReconcileLoading] = useState(false);
+  const [counterfactualPolicyHash, setCounterfactualPolicyHash] = useState("");
+  const [counterfactualCompareHash, setCounterfactualCompareHash] = useState("");
+  const [counterfactualSince, setCounterfactualSince] = useState(() => {
+    const date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return date.toISOString().slice(0, 16);
+  });
+  const [counterfactualUntil, setCounterfactualUntil] = useState(() => new Date().toISOString().slice(0, 16));
+  const [counterfactualLimit, setCounterfactualLimit] = useState("200");
+  const [counterfactualReport, setCounterfactualReport] = useState<BlastRadiusReport | null>(null);
+  const [counterfactualLoading, setCounterfactualLoading] = useState(false);
+  const [counterfactualError, setCounterfactualError] = useState("");
 
   useEffect(() => {
     const loadLineage = async () => {
@@ -152,6 +166,12 @@ export function PolicySandbox() {
       setVerificationPolicyHash(lineage.policyHash);
     }
   }, [lineage?.policyHash, verificationPolicyHash]);
+
+  useEffect(() => {
+    if (lineage?.policyHash && !counterfactualPolicyHash) {
+      setCounterfactualPolicyHash(lineage.policyHash);
+    }
+  }, [lineage?.policyHash, counterfactualPolicyHash]);
 
   useEffect(() => {
     const rollbackCandidates = lineage?.lineage.filter((record) => record.policyHash !== lineage.policyHash) ?? [];
@@ -454,6 +474,40 @@ export function PolicySandbox() {
     }
   };
 
+  const handleCounterfactual = async () => {
+    setCounterfactualLoading(true);
+    setCounterfactualError("");
+    setCounterfactualReport(null);
+    try {
+      if (!counterfactualPolicyHash.trim()) {
+        throw new Error("Policy hash is required.");
+      }
+      const since = new Date(counterfactualSince);
+      const until = new Date(counterfactualUntil);
+      if (!Number.isFinite(since.getTime()) || !Number.isFinite(until.getTime())) {
+        throw new Error("Both since and until timestamps are required.");
+      }
+      const parsedLimit = Number(counterfactualLimit);
+      const basePayload = {
+        policyHash: counterfactualPolicyHash.trim(),
+        since: since.toISOString(),
+        until: until.toISOString(),
+        limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined
+      };
+      const response = counterfactualCompareHash.trim()
+        ? await computeCounterfactual({
+            ...basePayload,
+            compareToPolicyHash: counterfactualCompareHash.trim()
+          })
+        : await fetchBlastRadius(basePayload);
+      setCounterfactualReport(response);
+    } catch (err) {
+      setCounterfactualError((err as Error).message);
+    } finally {
+      setCounterfactualLoading(false);
+    }
+  };
+
   const handlePromote = async () => {
     if (!report) {
       return;
@@ -649,6 +703,27 @@ export function PolicySandbox() {
     return "impact-badge impact-badge-low";
   };
 
+  const deltaBadgeClass = (value?: number) => {
+    if (value === undefined) {
+      return "impact-badge impact-badge-medium";
+    }
+    if (value > 0) {
+      return "impact-badge impact-badge-high";
+    }
+    if (value < 0) {
+      return "impact-badge impact-badge-low";
+    }
+    return "impact-badge impact-badge-medium";
+  };
+
+  const formatDelta = (value?: number) => {
+    if (value === undefined || !Number.isFinite(value)) {
+      return "n/a";
+    }
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(4)}`;
+  };
+
   const lifecycleBadgeClass = (state: string) => {
     switch (state) {
       case "ACTIVE":
@@ -686,6 +761,10 @@ export function PolicySandbox() {
 
   const rollbackCandidates = lineage?.lineage.filter((record) => record.policyHash !== lineage.policyHash) ?? [];
   const rollbackReady = Boolean(rollbackTargetHash.trim() && rollbackActor.trim() && rollbackRationale.trim());
+  const counterfactualReady =
+    Boolean(counterfactualPolicyHash.trim()) &&
+    Boolean(counterfactualSince.trim()) &&
+    Boolean(counterfactualUntil.trim());
 
   return (
     <section className="policy-sandbox" id="policy-sandbox">
@@ -1096,6 +1175,9 @@ export function PolicySandbox() {
           <button type="button" onClick={() => handleRollback(false)} disabled={!rollbackReady || rollbackLoading}>
             {rollbackLoading ? "Rolling back..." : "Rollback"}
           </button>
+          <a className="policy-packs-link" href="#policy-counterfactual">
+            View counterfactual impact before rollback
+          </a>
           {rollbackStatus && <span className="sandbox-success">{rollbackStatus}</span>}
           {rollbackError && <span className="sandbox-error">{rollbackError}</span>}
         </div>
@@ -1139,6 +1221,129 @@ export function PolicySandbox() {
                 <div>Event hash: {rollbackEvent.eventHash}</div>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      <div className="sandbox-card" id="policy-counterfactual">
+        <h3>Policy Counterfactual / Blast Radius</h3>
+        <p>Simulated report only. No execution performed.</p>
+        <div className="sandbox-row">
+          <label>
+            Policy hash
+            <input
+              type="text"
+              value={counterfactualPolicyHash}
+              onChange={(event) => setCounterfactualPolicyHash(event.target.value)}
+              placeholder="Candidate or rollback policy hash"
+            />
+          </label>
+          <label>
+            Compare to policy hash (optional)
+            <input
+              type="text"
+              value={counterfactualCompareHash}
+              onChange={(event) => setCounterfactualCompareHash(event.target.value)}
+              placeholder="Baseline policy hash"
+            />
+          </label>
+        </div>
+        <div className="sandbox-row">
+          <label>
+            Since
+            <input
+              type="datetime-local"
+              value={counterfactualSince}
+              onChange={(event) => setCounterfactualSince(event.target.value)}
+            />
+          </label>
+          <label>
+            Until
+            <input
+              type="datetime-local"
+              value={counterfactualUntil}
+              onChange={(event) => setCounterfactualUntil(event.target.value)}
+            />
+          </label>
+          <label>
+            Limit
+            <input
+              type="number"
+              min={1}
+              value={counterfactualLimit}
+              onChange={(event) => setCounterfactualLimit(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="sandbox-actions">
+          <button type="button" onClick={handleCounterfactual} disabled={!counterfactualReady || counterfactualLoading}>
+            {counterfactualLoading ? "Simulating..." : "Compute counterfactual"}
+          </button>
+          {counterfactualError && <span className="sandbox-error">{counterfactualError}</span>}
+        </div>
+        {counterfactualReport && (
+          <div className="sandbox-report">
+            <div className="report-grid">
+              <div>
+                <strong>Intents affected</strong>
+                <div className="impact-badge impact-badge-medium">{counterfactualReport.intentsAffected}</div>
+              </div>
+              <div>
+                <strong>Traces affected</strong>
+                <div className="impact-badge impact-badge-medium">{counterfactualReport.tracesAffected}</div>
+              </div>
+              <div>
+                <strong>Net approvals Δ</strong>
+                <div className={deltaBadgeClass(counterfactualReport.approvalRateDelta)}>
+                  {formatDelta(counterfactualReport.approvalRateDelta)}
+                </div>
+              </div>
+              <div>
+                <strong>Net rejections Δ</strong>
+                <div className={deltaBadgeClass(counterfactualReport.rejectionRateDelta)}>
+                  {formatDelta(counterfactualReport.rejectionRateDelta)}
+                </div>
+              </div>
+              <div>
+                <strong>Risk score Δ</strong>
+                <div className={deltaBadgeClass(counterfactualReport.riskScoreDelta)}>
+                  {formatDelta(counterfactualReport.riskScoreDelta)}
+                </div>
+              </div>
+              <div>
+                <strong>Report hash</strong>
+                <div>{counterfactualReport.reportHash}</div>
+              </div>
+            </div>
+            <p>
+              <strong>Simulated / No execution performed</strong>
+            </p>
+            <table className="sandbox-table">
+              <thead>
+                <tr>
+                  <th>Outcome</th>
+                  <th>Before</th>
+                  <th>After</th>
+                  <th>Δ</th>
+                  <th>Severity shift</th>
+                </tr>
+              </thead>
+              <tbody>
+                {counterfactualReport.outcomes.map((delta) => (
+                  <tr key={delta.outcomeType}>
+                    <td>{delta.outcomeType}</td>
+                    <td>{delta.beforeCount}</td>
+                    <td>{delta.afterCount}</td>
+                    <td>{delta.delta}</td>
+                    <td>
+                      {delta.severityShift
+                        ? `${delta.severityShift.beforeAvg} → ${delta.severityShift.afterAvg} (Δ ${delta.severityShift.delta})`
+                        : "n/a"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

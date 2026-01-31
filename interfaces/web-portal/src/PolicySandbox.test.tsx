@@ -8,7 +8,8 @@ import type {
   PolicyImpactSimulationReport,
   PromotionGuardrailDecision,
   PolicyLifecycleTimeline,
-  PolicyVerificationResponse
+  PolicyVerificationResponse,
+  BlastRadiusReport
 } from "./api";
 
 vi.mock("./api", () => ({
@@ -24,6 +25,8 @@ vi.mock("./api", () => ({
   fetchIntentDecision: vi.fn(),
   approveIntent: vi.fn(),
   executeIntent: vi.fn(),
+  computeCounterfactual: vi.fn(),
+  fetchBlastRadius: vi.fn(),
   fetchPromotionCheck: vi.fn(),
   fetchPolicyTimeline: vi.fn(),
   fetchPolicyVerify: vi.fn(),
@@ -188,6 +191,28 @@ const baseImpactReport: PolicyImpactSimulationReport = {
   ]
 };
 
+const baseCounterfactual: BlastRadiusReport = {
+  traceId: "trace-1",
+  policyHash: "policy-candidate",
+  baselinePolicyHash: "policy-baseline",
+  window: { since: "2024-02-01T00:00:00Z", until: "2024-02-02T00:00:00Z" },
+  intentsAffected: 2,
+  tracesAffected: 3,
+  outcomes: [
+    {
+      outcomeType: "failure",
+      beforeCount: 1,
+      afterCount: 2,
+      delta: 1,
+      severityShift: { beforeAvg: 2, afterAvg: 3, delta: 1 }
+    }
+  ],
+  approvalRateDelta: -0.125,
+  rejectionRateDelta: 0.125,
+  riskScoreDelta: 1.5,
+  reportHash: "report-hash-1"
+};
+
 const baseGuardrailDecision: PromotionGuardrailDecision = {
   allowed: false,
   requiredAcceptance: true,
@@ -300,6 +325,34 @@ test("promotion button enables after approval details when impact is within thre
   await waitFor(() => {
     expect(screen.getByRole("button", { name: /promote policy/i })).toBeEnabled();
   });
+});
+
+test("counterfactual panel renders summary and outcomes", async () => {
+  const { fetchPolicyLineageCurrent, fetchPolicyDrift, fetchPolicyQuality, computeCounterfactual } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+  vi.mocked(computeCounterfactual).mockResolvedValue(baseCounterfactual);
+
+  render(<PolicySandbox />);
+
+  const panelHeading = await screen.findByRole("heading", { name: /Policy Counterfactual/i });
+  const panel = panelHeading.closest(".sandbox-card");
+  expect(panel).not.toBeNull();
+  const panelQueries = within(panel as HTMLElement);
+
+  fireEvent.change(panelQueries.getByLabelText(/^Policy hash$/i), { target: { value: "policy-candidate" } });
+  fireEvent.change(panelQueries.getByLabelText(/Compare to policy hash/i), { target: { value: "policy-baseline" } });
+  fireEvent.click(panelQueries.getByRole("button", { name: /Compute counterfactual/i }));
+
+  await panelQueries.findByText(/Simulated \/ No execution performed/i);
+  expect(panelQueries.getByText("Intents affected")).toBeInTheDocument();
+  expect(panelQueries.getByText("failure")).toBeInTheDocument();
+  expect(panelQueries.getByText(baseCounterfactual.reportHash)).toBeInTheDocument();
 });
 
 test("policy lineage renders without crashing", async () => {
@@ -456,9 +509,9 @@ test("policy impact simulation renders blast radius summary", async () => {
     );
   });
 
-  expect(await screen.findByText(/Blast radius/i)).toBeInTheDocument();
-  expect(screen.getByText("10")).toBeInTheDocument();
-  expect(screen.getByText(/NEWLY_BLOCKED/)).toBeInTheDocument();
+  expect(await impactScope.findByText(/Blast radius/i)).toBeInTheDocument();
+  expect(impactScope.getByText("10")).toBeInTheDocument();
+  expect(impactScope.getByText(/NEWLY_BLOCKED/)).toBeInTheDocument();
 });
 
 test("promotion guardrail check renders reasons", async () => {

@@ -36,7 +36,23 @@ Done. Key links and IDs:
 • Policy drift: http://localhost:8080/v1/policy/drift?policyHash=2f1a0c8c-...
 • Policy lineage: http://localhost:8080/v1/policy/lineage/current
 • Promotion guardrails: http://localhost:8080/v1/policy/promote/check?policyHash=2f1a0c8c-...
+• Counterfactual blast radius: http://localhost:8080/v1/policy/blast-radius?policyHash=2f1a0c8c-...
 • Web portal: http://localhost:5173
+```
+
+## Counterfactual blast radius
+Use the recorded replay/outcome data to generate a deterministic counterfactual report for a policy hash (no policy execution occurs).
+
+Example command:
+```bash
+curl -s -X POST http://localhost:8080/v1/policy/counterfactual \\
+  -H 'content-type: application/json' \\
+  -d '{\"policyHash\":\"<POLICY_HASH>\",\"compareToPolicyHash\":\"<BASELINE_HASH>\",\"since\":\"2024-02-01T00:00:00Z\",\"until\":\"2024-02-02T00:00:00Z\"}' | jq
+```
+
+Self-check:
+```bash
+curl -s \"http://localhost:8080/v1/policy/blast-radius?policyHash=<POLICY_HASH>&since=2024-02-01T00:00:00Z&until=2024-02-02T00:00:00Z\" | jq '.reportHash'
 ```
 
 ## Screenshots checklist (web portal)

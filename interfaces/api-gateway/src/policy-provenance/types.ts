@@ -49,6 +49,7 @@ export type PolicyProvenanceReport = {
   approvals: PolicyApprovalRecord[];
   driftReport: DriftReport | null;
   impactSimulationSummary: PolicyImpactSimulationSummary | null;
+  counterfactualReportHash?: string;
   determinism: PolicyDeterminismVerification;
   reportHash: string;
 };

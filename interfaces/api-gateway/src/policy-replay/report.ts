@@ -34,7 +34,11 @@ function buildTotals(results: ReplayResultRecord[]): ReplayReportTotals {
   };
 }
 
-export function buildReport(run: ReplayRunRecord, results: ReplayResultRecord[]): ReplayReport {
+export function buildReport(
+  run: ReplayRunRecord,
+  results: ReplayResultRecord[],
+  outcomeOverlay?: ReplayReport["outcomeOverlay"]
+): ReplayReport {
   const totals = buildTotals(results);
   const byIntentTypeMap = new Map<
     ReplayResultRecord["intentType"],
@@ -153,7 +157,7 @@ export function buildReport(run: ReplayRunRecord, results: ReplayResultRecord[])
 
   const impact = calculatePolicyImpact(results, config.policyImpact);
 
-  return {
+  const report: ReplayReport = {
     run: {
       runId: run.id,
       createdAt: run.createdAt,
@@ -181,4 +185,10 @@ export function buildReport(run: ReplayRunRecord, results: ReplayResultRecord[])
     topChangedExamples,
     impact
   };
+
+  if (outcomeOverlay) {
+    report.outcomeOverlay = outcomeOverlay;
+  }
+
+  return report;
 }

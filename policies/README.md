@@ -148,6 +148,24 @@ Example: fetch the current lineage chain:
 curl -s http://localhost:3000/v1/policy/lineage/current | jq
 ```
 
+## Outcome feedback loop
+
+Real-world outcomes can be recorded against a trace ID to build an outcome-weighted quality signal for policies. Outcomes must reference an existing intent + policy decision. Severity ranges from 1 (low) to 5 (high).
+
+Example: record an outcome:
+```bash
+curl -s -X POST http://localhost:3000/v1/policy/outcomes \
+  -H 'content-type: application/json' \
+  -d '{"traceId":"TRACE_ID","outcomeType":"failure","severity":3,"notes":"Synthetic follow-up"}' | jq
+```
+
+Example: fetch quality metrics for a policy hash:
+```bash
+curl -s "http://localhost:3000/v1/policy/quality?policyHash=POLICY_HASH" | jq
+```
+
+Quality score notes (window-scoped): failures are weighted 3× severity, rollbacks 2×, overrides 1×, and successes 0×. The weighted penalty is normalized against the maximum possible penalty (severity 5, weight 3) to produce a 0–100 score.
+
 ## Safe fallback
 
 If policy loading fails and no cached policy exists, the gateway uses a safe fallback:

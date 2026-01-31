@@ -96,6 +96,17 @@ export type ReplayReport = {
     candidateRules: string[];
   }>;
   impact: PolicyImpactReport;
+  outcomeOverlay?: {
+    policyHash: string;
+    window: { since: string; until: string };
+    metrics: {
+      totalOutcomes: number;
+      failureRate: number;
+      overrideRate: number;
+      weightedPenalty: number;
+      qualityScore: number;
+    };
+  };
 };
 
 export async function runPolicyReplay(payload: {
@@ -195,6 +206,51 @@ export async function fetchPolicyLineageByHash(policyHash: string): Promise<Poli
   const response = await fetch(buildUrl(`/v1/policy/lineage/${encodeURIComponent(policyHash)}`));
   if (!response.ok) {
     throw new Error("Policy lineage request failed");
+  }
+  return response.json();
+}
+
+export type PolicyOutcomeType = "success" | "failure" | "override" | "rollback";
+
+export type PolicyQualityResponse = {
+  traceId: string;
+  policyHash: string;
+  window: { since: string | null; until: string | null };
+  metrics: {
+    totalOutcomes: number;
+    failureRate: number;
+    overrideRate: number;
+    weightedPenalty: number;
+    qualityScore: number;
+  };
+};
+
+export async function recordPolicyOutcome(payload: {
+  traceId: string;
+  outcomeType: PolicyOutcomeType;
+  severity?: number;
+  humanOverride?: boolean;
+  notes?: string;
+}) {
+  const response = await fetch(buildUrl("/v1/policy/outcomes"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => ({}));
+    const message = typeof errorPayload.message === "string" ? errorPayload.message : "Outcome recording failed";
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function fetchPolicyQuality(policyHash: string): Promise<PolicyQualityResponse> {
+  const response = await fetch(buildUrl(`/v1/policy/quality?policyHash=${encodeURIComponent(policyHash)}`));
+  if (!response.ok) {
+    throw new Error("Policy quality request failed");
   }
   return response.json();
 }

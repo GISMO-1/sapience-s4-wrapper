@@ -94,6 +94,11 @@ Policy replay now includes an executive-ready impact report plus a minimal sandb
 - `GET /v1/policy/lineage/current` to view the active policy lineage chain.
 - `GET /v1/policy/lineage/:policyHash` to view lineage for a specific policy hash.
 
+Outcome feedback loop endpoints capture real-world results and compute outcome-weighted policy quality signals:
+- `POST /v1/policy/outcomes` to record a success/failure/override/rollback outcome for a trace ID.
+- `GET /v1/policy/outcomes/:traceId` to inspect outcomes tied to a trace.
+- `GET /v1/policy/quality?policyHash=...` to compute windowed quality metrics for a policy hash.
+
 ## Why lineage matters
 Policy lineage provides a clear audit trail for how guardrails evolve. By capturing parent relationships, rationale, accepted risk scores, and drift summaries on every promotion, teams can explain why a policy changed and quantify the blast radius before it reaches production.
 

@@ -20,6 +20,9 @@ import { calculatePolicyImpact } from "./policy-lifecycle/impact";
 import { createPolicyLifecycleStore } from "./policy-lifecycle/store";
 import { buildPolicyDriftSummary } from "./policy-lineage/drift";
 import { createPolicyLineageStore } from "./policy-lineage/store";
+import { createPolicyOutcomeStore } from "./policy-outcomes/store";
+import type { PolicyOutcomeRecord } from "./policy-outcomes/types";
+import { calculatePolicyQuality } from "./policy-quality/score";
 
 const intentStore = createIntentStore();
 const policyStore = createPolicyStore();
@@ -28,6 +31,7 @@ const replayStore = createPolicyReplayStore();
 const replayEngine = createPolicyReplayEngine(replayStore);
 const lifecycleStore = createPolicyLifecycleStore();
 const lineageStore = createPolicyLineageStore();
+const outcomeStore = createPolicyOutcomeStore();
 
 const intentSchema = z.object({
   text: z.string().min(1)
@@ -88,6 +92,32 @@ const promoteRequestSchema = z.object({
   notes: z.string().optional()
 });
 
+const outcomeRequestSchema = z.object({
+  traceId: z.string().min(1),
+  outcomeType: z.enum(["success", "failure", "override", "rollback"]),
+  severity: z.number().int().min(1).max(5).default(1),
+  humanOverride: z.boolean().default(false),
+  notes: z.string().optional()
+});
+
+const outcomeListQuerySchema = z.object({
+  policyHash: z.string().optional(),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.string().optional()
+});
+
+const policyQualityQuerySchema = z.object({
+  policyHash: z.string().min(1),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional()
+});
+
+const replayReportOutcomeQuerySchema = z.object({
+  outcomesSince: z.string().datetime().optional(),
+  outcomesUntil: z.string().datetime().optional()
+});
+
 function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; action: string } {
   switch (intentType) {
     case "CREATE_PO":
@@ -99,6 +129,22 @@ function mapIntentToAction(intentType: Intent["intentType"]): { intent: string; 
     default:
       return { intent: "unknown", action: "noop" };
   }
+}
+
+function serializeOutcome(outcome: PolicyOutcomeRecord) {
+  return {
+    id: outcome.id,
+    traceId: outcome.traceId,
+    intentType: outcome.intentType,
+    policyHash: outcome.policyHash,
+    decision: outcome.decision,
+    outcomeType: outcome.outcomeType,
+    severity: outcome.severity,
+    humanOverride: outcome.humanOverride,
+    notes: outcome.notes ?? undefined,
+    observedAt: outcome.observedAt.toISOString(),
+    createdAt: outcome.createdAt.toISOString()
+  };
 }
 
 async function proxyRequest(request: any, reply: any, baseUrl: string, path: string) {
@@ -289,6 +335,80 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.post("/v1/policy/outcomes", async (request, reply) => {
+    const traceId = getTraceIdFromRequest(request);
+    const body = outcomeRequestSchema.parse(request.body ?? {});
+    const storedIntent = await intentStore.getIntentByTraceId(body.traceId);
+    if (!storedIntent) {
+      reply.code(404);
+      return { message: "Intent not found", traceId: body.traceId };
+    }
+    const policyRecord = await policyStore.getPolicyByTraceId(body.traceId);
+    if (!policyRecord) {
+      reply.code(404);
+      return { message: "Policy decision not found", traceId: body.traceId };
+    }
+
+    const outcomeRecord = await outcomeStore.recordOutcome({
+      traceId: body.traceId,
+      intentType: storedIntent.intent.intentType,
+      policyHash: policyRecord.policyHash,
+      decision: policyRecord.decision,
+      outcomeType: body.outcomeType,
+      severity: body.severity,
+      humanOverride: body.humanOverride,
+      notes: body.notes ?? null
+    });
+
+    return {
+      traceId,
+      stored: true,
+      outcome: serializeOutcome(outcomeRecord)
+    };
+  });
+
+  app.get("/v1/policy/outcomes/:traceId", async (request) => {
+    const traceId = String((request.params as { traceId: string }).traceId);
+    const outcomes = await outcomeStore.getOutcomesByTraceId(traceId);
+    return { traceId, outcomes: outcomes.map(serializeOutcome) };
+  });
+
+  app.get("/v1/policy/outcomes", async (request) => {
+    const traceId = getTraceIdFromRequest(request);
+    const query = outcomeListQuerySchema.parse(request.query ?? {});
+    const limit =
+      query.limit && Number.isFinite(Number(query.limit)) && Number(query.limit) > 0 ? Number(query.limit) : undefined;
+    const outcomes = await outcomeStore.listOutcomes({
+      policyHash: query.policyHash,
+      since: query.since ? new Date(query.since) : undefined,
+      until: query.until ? new Date(query.until) : undefined,
+      limit
+    });
+    return { traceId, outcomes: outcomes.map(serializeOutcome) };
+  });
+
+  app.get("/v1/policy/quality", async (request) => {
+    const traceId = getTraceIdFromRequest(request);
+    const query = policyQualityQuerySchema.parse(request.query ?? {});
+    const since = query.since ? new Date(query.since) : undefined;
+    const until = query.until ? new Date(query.until) : undefined;
+    const outcomes = await outcomeStore.listOutcomes({
+      policyHash: query.policyHash,
+      since,
+      until
+    });
+    const metrics = calculatePolicyQuality(outcomes);
+    return {
+      traceId,
+      policyHash: query.policyHash,
+      window: {
+        since: since ? since.toISOString() : null,
+        until: until ? until.toISOString() : null
+      },
+      metrics
+    };
+  });
+
   app.post("/v1/policy/replay", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
     const body = replayRequestSchema.parse(request.body ?? {});
@@ -353,13 +473,32 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get("/v1/policy/replay/:runId/report", async (request, reply) => {
     const traceId = getTraceIdFromRequest(request);
     const runId = String((request.params as { runId: string }).runId);
+    const outcomeQuery = replayReportOutcomeQuerySchema.parse(request.query ?? {});
     const run = await replayStore.getRun(runId);
     if (!run) {
       reply.code(404);
       return { message: "Replay run not found", traceId };
     }
     const results = await replayStore.getResults(runId, { limit: run.limit, offset: 0 });
-    const report = buildReport(run, results);
+    const now = new Date();
+    const since = outcomeQuery.outcomesSince
+      ? new Date(outcomeQuery.outcomesSince)
+      : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const until = outcomeQuery.outcomesUntil ? new Date(outcomeQuery.outcomesUntil) : now;
+    const outcomes = await outcomeStore.listOutcomes({
+      policyHash: run.candidatePolicyHash,
+      since,
+      until
+    });
+    const outcomeOverlay = {
+      policyHash: run.candidatePolicyHash,
+      window: {
+        since: since.toISOString(),
+        until: until.toISOString()
+      },
+      metrics: calculatePolicyQuality(outcomes)
+    };
+    const report = buildReport(run, results, outcomeOverlay);
     return { traceId, ...report };
   });
 

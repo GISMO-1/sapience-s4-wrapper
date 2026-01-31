@@ -6,6 +6,7 @@ export type PolicyDecision = "ALLOW" | "WARN" | "DENY";
 export type ExecutionMode = "manual" | "auto" | "simulate";
 export type AutoRequirement = "WARN" | "ALLOW_ONLY";
 export type IntentType = z.infer<typeof intentTypeSchema>;
+export type RequiredApproval = { role: string; reason: string };
 
 export type PolicyDefaults = {
   confidenceThreshold: number;
@@ -101,6 +102,7 @@ export type PolicyDecisionResult = {
   executionMode: ExecutionMode;
   policy: PolicyInfo;
   simulationAllowed: boolean;
+  requiredApprovals: RequiredApproval[];
 };
 
 export type PolicyEvaluationContext = {

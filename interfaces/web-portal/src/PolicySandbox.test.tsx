@@ -12,7 +12,10 @@ vi.mock("./api", () => ({
   fetchPolicyLineageCurrent: vi.fn(),
   fetchPolicyQuality: vi.fn(),
   fetchPolicyDrift: vi.fn(),
-  recordPolicyOutcome: vi.fn()
+  recordPolicyOutcome: vi.fn(),
+  fetchIntentDecision: vi.fn(),
+  approveIntent: vi.fn(),
+  executeIntent: vi.fn()
 }));
 
 const baseReport: ReplayReport = {
@@ -142,7 +145,8 @@ test("promotion button remains disabled when impact guardrails block promotion",
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
+  const rationaleInputs = screen.getAllByLabelText(/Rationale/i);
+  fireEvent.change(rationaleInputs[1], { target: { value: "Regression results match baseline." } });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   await waitFor(() => {
@@ -168,7 +172,8 @@ test("promotion button enables after approval details when impact is within thre
   await screen.findByText(/Replay report/i);
 
   fireEvent.change(screen.getByLabelText(/Approved by/i), { target: { value: "Reviewer" } });
-  fireEvent.change(screen.getByLabelText(/Rationale/i), { target: { value: "Regression results match baseline." } });
+  const rationaleInputs = screen.getAllByLabelText(/Rationale/i);
+  fireEvent.change(rationaleInputs[1], { target: { value: "Regression results match baseline." } });
   fireEvent.change(screen.getByLabelText(/Accepted risk score/i), { target: { value: "12" } });
 
   await waitFor(() => {
@@ -224,7 +229,8 @@ test("policy sandbox renders outcome form and submits payload", async () => {
   render(<PolicySandbox />);
 
   expect(await screen.findByRole("heading", { name: /Record outcome/i })).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText(/Trace ID/i), { target: { value: "trace-55" } });
+  const traceInputs = screen.getAllByLabelText(/Trace ID/i);
+  fireEvent.change(traceInputs[1], { target: { value: "trace-55" } });
   fireEvent.change(screen.getByLabelText(/Severity/i), { target: { value: "3" } });
   fireEvent.click(screen.getByRole("button", { name: /record outcome/i }));
 
@@ -254,4 +260,79 @@ test("policy health section renders and calls drift endpoint", async () => {
   await waitFor(() => {
     expect(fetchPolicyDrift).toHaveBeenCalledWith("policy-1");
   });
+});
+
+test("execution gate fetches decision and shows missing approvals", async () => {
+  const {
+    fetchPolicyLineageCurrent,
+    fetchPolicyDrift,
+    fetchPolicyQuality,
+    fetchIntentDecision,
+    approveIntent,
+    executeIntent
+  } = await import("./api");
+  vi.mocked(fetchPolicyLineageCurrent).mockResolvedValue({
+    traceId: "trace-1",
+    policyHash: "policy-1",
+    lineage: []
+  });
+  vi.mocked(fetchPolicyDrift).mockResolvedValue(baseDrift);
+  vi.mocked(fetchPolicyQuality).mockResolvedValue(baseQuality);
+
+  vi.mocked(fetchIntentDecision).mockResolvedValue({
+    traceId: "trace-intent",
+    intent: {
+      intentType: "REVIEW_INVOICE",
+      entities: { amount: 75000 },
+      confidence: 0.78,
+      rawText: "review invoice amount 75000"
+    },
+    policyHash: "policy-hash",
+    decision: {
+      outcome: "WARN",
+      requiredApprovals: [{ role: "FINANCE_REVIEWER", reason: "Invoice exceeds limit." }],
+      reasons: [],
+      matchedRuleIds: []
+    },
+    plan: { intent: "finance.invoice.review", action: "requestInvoiceReview" }
+  });
+
+  vi.mocked(approveIntent).mockResolvedValue({
+    ok: true,
+    approvals: [
+      {
+        id: "approval-1",
+        traceId: "trace-intent",
+        intentId: "intent-1",
+        policyHash: "policy-hash",
+        decisionId: "decision-1",
+        requiredRole: "FINANCE_REVIEWER",
+        actor: "local-user",
+        rationale: "Reviewed",
+        approvedAt: "2024-02-01T10:00:00Z"
+      }
+    ]
+  });
+
+  vi.mocked(executeIntent).mockResolvedValue({
+    ok: false,
+    status: 409,
+    data: { missingApprovals: ["FINANCE_REVIEWER"], message: "Missing approvals" }
+  });
+
+  render(<PolicySandbox />);
+
+  const traceInputs = screen.getAllByPlaceholderText("trace-id");
+  fireEvent.change(traceInputs[0], { target: { value: "trace-intent" } });
+
+  const approveButton = await screen.findByRole("button", { name: /Approve as FINANCE_REVIEWER/i });
+  fireEvent.click(approveButton);
+
+  await waitFor(() => {
+    expect(approveIntent).toHaveBeenCalled();
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /Execute/i }));
+
+  await screen.findByText(/Missing approvals:/i);
 });

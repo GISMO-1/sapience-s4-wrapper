@@ -14,7 +14,8 @@ export function createDefaultPolicyEngine(options: DefaultPolicyOptions): Policy
       if (intent.confidence < options.confidenceThreshold) {
         return {
           decision: "DENY",
-          reasons: ["Intent confidence below policy threshold."]
+          reasons: ["Intent confidence below policy threshold."],
+          requiredApprovals: []
         };
       }
 
@@ -22,11 +23,12 @@ export function createDefaultPolicyEngine(options: DefaultPolicyOptions): Policy
       if (context.executionMode === "auto" && risk === HIGH_RISK) {
         return {
           decision: "WARN",
-          reasons: ["High-risk intent flagged for auto execution."]
+          reasons: ["High-risk intent flagged for auto execution."],
+          requiredApprovals: []
         };
       }
 
-      return { decision: "ALLOW", reasons: [] };
+      return { decision: "ALLOW", reasons: [], requiredApprovals: [] };
     }
   };
 }

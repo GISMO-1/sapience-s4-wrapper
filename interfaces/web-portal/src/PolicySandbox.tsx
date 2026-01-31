@@ -6,12 +6,16 @@ import {
   fetchPolicyQuality,
   fetchPolicyDrift,
   recordPolicyOutcome,
+  fetchIntentDecision,
+  approveIntent,
+  executeIntent,
   promotePolicy,
   runPolicyReplay,
   type PolicyOutcomeType,
   type PolicyQualityResponse,
   type PolicyDriftResponse,
   type PolicyLineageResponse,
+  type IntentDecisionResponse,
   type ReplayCandidateSource,
   type ReplayReport
 } from "./api";
@@ -28,6 +32,25 @@ export function PolicySandbox() {
   const [report, setReport] = useState<ReplayReport | null>(null);
   const [traceExplain, setTraceExplain] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [executionTraceId, setExecutionTraceId] = useState("");
+  const [executionDecision, setExecutionDecision] = useState<IntentDecisionResponse | null>(null);
+  const [executionDecisionLoading, setExecutionDecisionLoading] = useState(false);
+  const [executionDecisionError, setExecutionDecisionError] = useState("");
+  const [executionApprover, setExecutionApprover] = useState("local-user");
+  const [executionRationale, setExecutionRationale] = useState("");
+  const [executionApprovals, setExecutionApprovals] = useState<
+    Array<{
+      requiredRole: string;
+      actor: string;
+      rationale: string;
+      approvedAt: string;
+    }>
+  >([]);
+  const [executionApprovalStatus, setExecutionApprovalStatus] = useState("");
+  const [executionApprovalError, setExecutionApprovalError] = useState("");
+  const [executionStatus, setExecutionStatus] = useState("");
+  const [executionError, setExecutionError] = useState("");
+  const [executionMissingApprovals, setExecutionMissingApprovals] = useState<string[]>([]);
   const [approver, setApprover] = useState("");
   const [approvalRationale, setApprovalRationale] = useState("");
   const [acceptedRiskScore, setAcceptedRiskScore] = useState("");
@@ -101,6 +124,31 @@ export function PolicySandbox() {
     };
     void loadDrift();
   }, [lineage?.policyHash]);
+
+  useEffect(() => {
+    const trimmed = executionTraceId.trim();
+    if (!trimmed) {
+      setExecutionDecision(null);
+      setExecutionDecisionError("");
+      setExecutionApprovals([]);
+      setExecutionMissingApprovals([]);
+      return;
+    }
+    const loadDecision = async () => {
+      setExecutionDecisionLoading(true);
+      setExecutionDecisionError("");
+      try {
+        const response = await fetchIntentDecision(trimmed);
+        setExecutionDecision(response);
+      } catch (err) {
+        setExecutionDecisionError((err as Error).message);
+        setExecutionDecision(null);
+      } finally {
+        setExecutionDecisionLoading(false);
+      }
+    };
+    void loadDecision();
+  }, [executionTraceId]);
 
   const buildFilters = () => {
     const parsedLimit = Number(limit);
@@ -178,6 +226,7 @@ export function PolicySandbox() {
   };
 
   const handleTraceExplain = async (traceId: string) => {
+    setExecutionTraceId(traceId);
     try {
       const response = await fetchTraceExplain(traceId);
       setTraceExplain(JSON.stringify(response, null, 2));
@@ -216,6 +265,68 @@ export function PolicySandbox() {
       }
     } catch (err) {
       setOutcomeError((err as Error).message);
+    }
+  };
+
+  const handleExecutionApprove = async (role: string) => {
+    if (!executionTraceId.trim()) {
+      return;
+    }
+    setExecutionApprovalStatus("");
+    setExecutionApprovalError("");
+    setExecutionMissingApprovals([]);
+    try {
+      const response = await approveIntent(executionTraceId.trim(), {
+        role,
+        actor: executionApprover.trim() || "local-user",
+        rationale: executionRationale.trim() || "Approved in policy sandbox."
+      });
+      setExecutionApprovals(
+        response.approvals.map((approval) => ({
+          requiredRole: approval.requiredRole,
+          actor: approval.actor,
+          rationale: approval.rationale,
+          approvedAt: approval.approvedAt
+        }))
+      );
+      setExecutionApprovalStatus(`Approval recorded for ${role}.`);
+      const refreshed = await fetchIntentDecision(executionTraceId.trim());
+      setExecutionDecision(refreshed);
+    } catch (err) {
+      setExecutionApprovalError((err as Error).message);
+    }
+  };
+
+  const handleExecution = async () => {
+    if (!executionTraceId.trim()) {
+      return;
+    }
+    setExecutionStatus("");
+    setExecutionError("");
+    setExecutionMissingApprovals([]);
+    const response = await executeIntent(executionTraceId.trim(), {
+      actor: executionApprover.trim() || undefined,
+      rationale: executionRationale.trim() || undefined
+    });
+    if (response.ok) {
+      setExecutionStatus("Execution request accepted.");
+      setExecutionApprovals([]);
+      try {
+        const refreshed = await fetchIntentDecision(executionTraceId.trim());
+        setExecutionDecision(refreshed);
+      } catch (err) {
+        setExecutionDecisionError((err as Error).message);
+      }
+      return;
+    }
+
+    const message =
+      typeof response.data?.message === "string"
+        ? response.data.message
+        : `Execution failed with status ${response.status}.`;
+    setExecutionError(message);
+    if (response.status === 409 && Array.isArray(response.data?.missingApprovals)) {
+      setExecutionMissingApprovals(response.data.missingApprovals);
     }
   };
 
@@ -458,6 +569,110 @@ export function PolicySandbox() {
               <strong>Quality score</strong>
               <div>{policyQuality.metrics.qualityScore.toFixed(1)}</div>
             </div>
+          </div>
+        )}
+      </div>
+
+      <div className="sandbox-card">
+        <h3>Execution Gate</h3>
+        <p>Review policy decisions, capture approvals, and trigger execution for a trace ID.</p>
+        <div className="sandbox-row">
+          <label>
+            Trace ID
+            <input
+              type="text"
+              value={executionTraceId}
+              onChange={(event) => setExecutionTraceId(event.target.value)}
+              placeholder="trace-id"
+            />
+          </label>
+          <label>
+            Actor
+            <input
+              type="text"
+              value={executionApprover}
+              onChange={(event) => setExecutionApprover(event.target.value)}
+              placeholder="local-user"
+            />
+          </label>
+        </div>
+        <div className="sandbox-row">
+          <label className="sandbox-notes">
+            Rationale
+            <textarea
+              value={executionRationale}
+              onChange={(event) => setExecutionRationale(event.target.value)}
+              rows={2}
+              placeholder="Reason for approval or execution"
+            />
+          </label>
+        </div>
+        {executionDecisionLoading && <span>Loading decision...</span>}
+        {executionDecisionError && <span className="sandbox-error">{executionDecisionError}</span>}
+        {executionDecision && (
+          <div className="report-grid">
+            <div>
+              <strong>Outcome</strong>
+              <div>{executionDecision.decision.outcome}</div>
+            </div>
+            <div>
+              <strong>Policy hash</strong>
+              <div>{executionDecision.policyHash}</div>
+            </div>
+            <div>
+              <strong>Action</strong>
+              <div>{executionDecision.plan?.action ?? "n/a"}</div>
+            </div>
+            <div>
+              <strong>Required approvals</strong>
+              {executionDecision.decision.requiredApprovals.length > 0 ? (
+                <ul>
+                  {executionDecision.decision.requiredApprovals.map((approval) => (
+                    <li key={approval.role}>
+                      {approval.role} — {approval.reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div>No approvals required.</div>
+              )}
+            </div>
+          </div>
+        )}
+        {executionApprovals.length > 0 && (
+          <div className="sandbox-section">
+            <strong>Recorded approvals</strong>
+            <ul>
+              {executionApprovals.map((approval) => (
+                <li key={`${approval.requiredRole}-${approval.actor}-${approval.approvedAt}`}>
+                  {approval.requiredRole} approved by {approval.actor} at {new Date(approval.approvedAt).toLocaleString()}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="sandbox-actions">
+          {executionDecision?.decision.requiredApprovals.map((approval) => (
+            <button
+              key={approval.role}
+              type="button"
+              onClick={() => handleExecutionApprove(approval.role)}
+              disabled={!executionTraceId.trim()}
+            >
+              Approve as {approval.role}
+            </button>
+          ))}
+          <button type="button" onClick={handleExecution} disabled={!executionTraceId.trim()}>
+            Execute
+          </button>
+          {executionApprovalStatus && <span className="sandbox-success">{executionApprovalStatus}</span>}
+          {executionApprovalError && <span className="sandbox-error">{executionApprovalError}</span>}
+          {executionStatus && <span className="sandbox-success">{executionStatus}</span>}
+          {executionError && <span className="sandbox-error">{executionError}</span>}
+        </div>
+        {executionMissingApprovals.length > 0 && (
+          <div className="sandbox-error">
+            Missing approvals: {executionMissingApprovals.join(", ")}
           </div>
         )}
       </div>

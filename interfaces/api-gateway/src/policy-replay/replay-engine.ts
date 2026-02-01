@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { createPolicyEvaluator, InMemoryRateLimiter } from "../policy-code/evaluator";
 import type { CandidatePolicySnapshot } from "../policy-code/loader";
 import type { ExecutionMode, PolicyDecision } from "../policy-code/types";
@@ -11,6 +10,7 @@ import type {
   ReplayRunDetails,
   ReplaySummary
 } from "./types";
+import { generateId } from "../testing/determinism";
 
 const DEFAULT_LIMIT = 100;
 const EXAMPLE_LIMIT = 10;
@@ -134,7 +134,7 @@ export function createPolicyReplayEngine(store: PolicyReplayStore) {
         !compareRuleLists(intent.baselineMatchedRules, evaluation.matchedRuleIds);
 
       results.push({
-        id: randomUUID(),
+        id: generateId(),
         runId: run.id,
         traceId: intent.traceId,
         intentType: intent.intentType,

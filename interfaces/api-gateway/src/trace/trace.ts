@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import type { Logger } from "pino";
-import { randomUUID } from "node:crypto";
+import { generateId } from "../testing/determinism";
 
 const TRACE_HEADER = "x-trace-id";
 
@@ -16,7 +16,7 @@ export function ensureTraceId(headers?: Record<string, string | string[] | undef
   if (candidate && candidate.trim().length > 0) {
     return candidate;
   }
-  return randomUUID();
+  return generateId();
 }
 
 export function getTraceIdFromRequest(request: Pick<FastifyRequest, "headers">): string {

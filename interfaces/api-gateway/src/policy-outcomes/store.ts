@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import type { PolicyOutcomeFilters, PolicyOutcomeInput, PolicyOutcomeRecord } from "./types";
 import { PostgresPolicyOutcomeStore } from "./store.pg";
+import { generateId, now } from "../testing/determinism";
 
 export type PolicyOutcomeStore = {
   recordOutcome: (input: PolicyOutcomeInput) => Promise<PolicyOutcomeRecord>;
@@ -21,9 +21,9 @@ export class InMemoryPolicyOutcomeStore implements PolicyOutcomeStore {
   private readonly outcomes: PolicyOutcomeRecord[] = [];
 
   async recordOutcome(input: PolicyOutcomeInput): Promise<PolicyOutcomeRecord> {
-    const observedAt = input.observedAt ?? new Date();
+    const observedAt = input.observedAt ?? now();
     const record: PolicyOutcomeRecord = {
-      id: randomUUID(),
+      id: generateId(),
       traceId: input.traceId,
       intentType: input.intentType,
       policyHash: input.policyHash,
@@ -33,7 +33,7 @@ export class InMemoryPolicyOutcomeStore implements PolicyOutcomeStore {
       humanOverride: input.humanOverride,
       notes: input.notes ?? null,
       observedAt,
-      createdAt: new Date()
+      createdAt: now()
     };
     this.outcomes.push(record);
     return record;

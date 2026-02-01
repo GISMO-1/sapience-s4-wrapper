@@ -9,6 +9,7 @@ import type {
   RiskAssessment
 } from "./types";
 import { deriveRequiredApprovals } from "./approvals";
+import { nowMs } from "../testing/determinism";
 
 export type RateLimiter = {
   isLimited: (key: string, windowSeconds: number, max: number) => boolean;
@@ -17,7 +18,7 @@ export type RateLimiter = {
 export class InMemoryRateLimiter implements RateLimiter {
   private readonly entries = new Map<string, number[]>();
 
-  constructor(private readonly now: () => number = () => Date.now()) {}
+  constructor(private readonly now: () => number = () => nowMs()) {}
 
   isLimited(key: string, windowSeconds: number, max: number): boolean {
     const windowMs = windowSeconds * 1000;
@@ -120,7 +121,7 @@ export function createPolicyEvaluator(options?: {
   loader?: typeof policyLoader;
   now?: () => number;
 }): PolicyEvaluator {
-  const limiter = options?.limiter ?? new InMemoryRateLimiter(options?.now);
+  const limiter = options?.limiter ?? new InMemoryRateLimiter(options?.now ?? (() => nowMs()));
   const loader = options?.loader ?? policyLoader;
 
   const evaluate = (intent: Intent, context: PolicyEvaluationContext): PolicyDecisionResult => {

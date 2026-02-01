@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import type { IntentApprovalInput, IntentApprovalRecord, IntentApprovalStore } from "./types";
 import { PostgresIntentApprovalStore } from "./store.pg";
+import { generateId, now } from "../testing/determinism";
 
 function sortApprovals(a: IntentApprovalRecord, b: IntentApprovalRecord): number {
   const timeDiff = a.approvedAt.getTime() - b.approvedAt.getTime();
@@ -27,7 +27,7 @@ export class InMemoryIntentApprovalStore implements IntentApprovalStore {
       return existing;
     }
     const record: IntentApprovalRecord = {
-      id: randomUUID(),
+      id: generateId(),
       traceId: input.traceId,
       intentId: input.intentId,
       policyHash: input.policyHash,
@@ -35,7 +35,7 @@ export class InMemoryIntentApprovalStore implements IntentApprovalStore {
       requiredRole: input.requiredRole,
       actor: input.actor,
       rationale: input.rationale,
-      approvedAt: input.approvedAt ?? new Date()
+      approvedAt: input.approvedAt ?? now()
     };
     this.approvals.push(record);
     return record;

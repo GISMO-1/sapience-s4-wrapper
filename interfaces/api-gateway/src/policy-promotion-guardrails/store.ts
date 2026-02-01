@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { config } from "../config";
 import type { GuardrailCheckInput, GuardrailCheckRecord } from "./types";
+import { generateId, now } from "../testing/determinism";
 
 export type GuardrailCheckStore = {
   recordCheck: (input: GuardrailCheckInput) => Promise<GuardrailCheckRecord>;
@@ -13,8 +14,8 @@ export class InMemoryGuardrailCheckStore implements GuardrailCheckStore {
 
   async recordCheck(input: GuardrailCheckInput): Promise<GuardrailCheckRecord> {
     const record: GuardrailCheckRecord = {
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
+      id: generateId(),
+      createdAt: now().toISOString(),
       ...input
     };
     this.records.push(record);

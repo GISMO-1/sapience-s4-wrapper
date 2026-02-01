@@ -1,0 +1,3547 @@
+{
+  "hashes": {
+    "policyBlastRadius": "5fe9834c676e90609fee2a41ad2277c2da549e473729e497803fe8ff421d3a50",
+    "policyCounterfactual": "3b70a8d25b0714987305e752a089eaf24117214f82b7e570ab5b75855c4f15cc",
+    "policyDrift": "a68c86920135596e3d8a8b8a03bfff6c6039533a94fb16213e4db53755154ca8",
+    "policyEvents": "1a44257496ef799b274dc07229d1e0a2e40ab307f8fa6ec12e9ef9873cb052c1",
+    "policyImpact": "cb460deda423b891cc45a2801a6c4ecedf5d477f977755e072eacdb525c009ac",
+    "policyProvenance": "deb9181c3f6298dc1166d7d84a4af947dcaae5b0cf69c1cabeabbe0d53725f26",
+    "policyQuality": "1bac208439cd1341f1ffa47ea315fecaf218041c564264ac40a7b6bb06be507d",
+    "policyVerify": "01388942d80ffb31e4862db8a5a28afdcd8b427435cf55bb8e319d2574d6ebbe",
+    "promoteCurrent": "5cc51ea39d09cb09a9b335311233034b164d43e37f383fe55fd9dfb80e4cdca8",
+    "promoteInline": "3cfce089c2e2c17d700566eeb81479b2e80065d79f66848ce0459b8256a86182",
+    "reconcile": "4814b40e1e92b94165e2b144e1bc85e475982a69ae9f492e17e8b6beba3fe8b6",
+    "replayReportCurrent": "6be80221dc2b55c78a5a10655b4e41186297ad0635f997430e5cde78af5329cf",
+    "replayReportInline": "61f476b140710d45ced4b2bb7d47703e7a47029694f62114d189942179fa6cbb",
+    "replayReportPath": "63db8e9e44602643ea09d3584227fb3b72d2abc302f2a1a0ee43bbf2397e2a91",
+    "rollback": "fe8e27bd9cf410a18343f32ee9a7c70f48d4444215abfcf18b9d004ff0c2f3a9"
+  },
+  "manifest": {
+    "generatedAt": "2024-03-05T12:00:00Z",
+    "intents": [
+      {
+        "createdAt": "2024-03-01T00:00:00Z",
+        "intentType": "CREATE_PO",
+        "text": "Create PO for vendor VENDOR-BLUE amount 1200 sku SKU-100 qty 5",
+        "traceId": "trace-golden-001"
+      },
+      {
+        "createdAt": "2024-03-01T00:10:00Z",
+        "intentType": "CREATE_PO",
+        "text": "Create PO for vendor VENDOR-RED amount 2500 sku BLOCKED-SKU-1 qty 12",
+        "traceId": "trace-golden-002"
+      },
+      {
+        "createdAt": "2024-03-01T00:20:00Z",
+        "intentType": "CHECK_INVENTORY",
+        "text": "Check inventory for sku SKU-ALPHA qty 2",
+        "traceId": "trace-golden-003"
+      },
+      {
+        "createdAt": "2024-03-01T00:30:00Z",
+        "intentType": "CHECK_INVENTORY",
+        "text": "Check inventory for sku BLOCKED-SKU-2",
+        "traceId": "trace-golden-004"
+      },
+      {
+        "createdAt": "2024-03-01T00:40:00Z",
+        "intentType": "REVIEW_INVOICE",
+        "text": "Review invoice INV-1000 amount 45000",
+        "traceId": "trace-golden-005"
+      },
+      {
+        "createdAt": "2024-03-01T00:50:00Z",
+        "intentType": "REVIEW_INVOICE",
+        "text": "Review invoice INV-9000 amount 75000",
+        "traceId": "trace-golden-006"
+      },
+      {
+        "createdAt": "2024-03-01T01:00:00Z",
+        "intentType": "CREATE_PO",
+        "text": "Create purchase order for vendor VENDOR-GREEN amount 800 sku SKU-777 qty 15",
+        "traceId": "trace-golden-007"
+      },
+      {
+        "createdAt": "2024-03-01T01:10:00Z",
+        "intentType": "CHECK_INVENTORY",
+        "text": "Check inventory stock for sku SKU-BETA qty 9",
+        "traceId": "trace-golden-008"
+      },
+      {
+        "createdAt": "2024-03-01T01:20:00Z",
+        "intentType": "REVIEW_INVOICE",
+        "text": "Review invoice INV-333 amount 200",
+        "traceId": "trace-golden-009"
+      },
+      {
+        "createdAt": "2024-03-01T01:30:00Z",
+        "intentType": "CREATE_PO",
+        "text": "Create PO for vendor VENDOR-ORANGE amount 300 sku SKU-123 qty 2",
+        "traceId": "trace-golden-010"
+      },
+      {
+        "createdAt": "2024-03-01T01:40:00Z",
+        "intentType": "CHECK_INVENTORY",
+        "text": "Check inventory for sku SKU-GAMMA qty 20",
+        "traceId": "trace-golden-011"
+      },
+      {
+        "createdAt": "2024-03-01T01:50:00Z",
+        "intentType": "REVIEW_INVOICE",
+        "text": "Review invoice INV-888 amount 1000",
+        "traceId": "trace-golden-012"
+      }
+    ],
+    "outcomes": [
+      {
+        "humanOverride": false,
+        "notes": "Golden demo failure",
+        "outcomeType": "failure",
+        "severity": 4,
+        "traceId": "trace-golden-004"
+      },
+      {
+        "humanOverride": false,
+        "notes": "Golden demo success",
+        "outcomeType": "success",
+        "severity": 1,
+        "traceId": "trace-golden-001"
+      },
+      {
+        "humanOverride": true,
+        "notes": "Golden demo override",
+        "outcomeType": "override",
+        "severity": 2,
+        "traceId": "trace-golden-006"
+      },
+      {
+        "humanOverride": true,
+        "notes": "Golden demo rollback",
+        "outcomeType": "rollback",
+        "severity": 3,
+        "traceId": "trace-golden-010"
+      }
+    ],
+    "policies": {
+      "currentPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "currentPolicyPath": "policies.v1.yaml",
+      "inlinePolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+      "inlinePolicyYaml": "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.7\n  execution:\n    autoRequires: [\"WARN\"]\nrules:\n  - id: \"inline-max-invoice-amount\"\n    enabled: true\n    priority: 95\n    appliesTo:\n      intentTypes: [\"REVIEW_INVOICE\"]\n    constraints:\n      - type: \"MAX_AMOUNT\"\n        params:\n          max: 25000\n    decision: \"DENY\"\n    reason: \"Inline policy caps invoice auto-review.\"\n    tags: [\"finance\", \"guardrail\"]\n  - id: \"inline-blocked-vendor\"\n    enabled: true\n    priority: 85\n    appliesTo:\n      intentTypes: [\"CREATE_PO\"]\n    constraints:\n      - type: \"VENDOR_BLOCKLIST\"\n        params:\n          vendors: [\"VENDOR-BLACK\"]\n    decision: \"DENY\"\n    reason: \"Inline policy blocks VENDOR-BLACK.\"\n    tags: [\"compliance\"]\n",
+      "pathPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "pathPolicyRef": "policies.v1.yaml"
+    },
+    "windows": {
+      "drift": {
+        "baselineSince": "2024-02-07T00:00:00Z",
+        "baselineUntil": "2024-03-08T00:00:00Z",
+        "since": "2024-03-08T00:00:00Z",
+        "until": "2024-03-15T00:00:00Z"
+      },
+      "intents": {
+        "since": "2024-03-01T00:00:00Z",
+        "until": "2024-03-15T00:00:00Z"
+      },
+      "outcomes": {
+        "since": "2024-03-01T00:00:00Z",
+        "until": "2024-03-15T00:00:00Z"
+      },
+      "replayReport": {
+        "since": "2024-02-01T00:00:00Z",
+        "until": "2024-03-15T00:00:00Z"
+      }
+    }
+  },
+  "provenanceMarkdown": "# Policy Provenance Report\n\n- Policy Hash: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Report Hash: 7c521e629ba91447b55d39e4600b2b004e50950fbdef5a64a8caeebb7cae67e4\n- As Of: 2024-03-05T12:00:00.000Z\n- Lifecycle State: ACTIVE\n- Determinism Verified: No\n- Counterfactual Report Hash: 5621fec51bfa3cdcf3de31da282fd4fa01206c51b9b4f5a6f22ecadfb0aa1698\n\n## Metadata\n\n- Status State: active\n- Status Updated At: 2024-03-05T12:00:00.000Z\n- Version: v1\n- Path: policies.v1.yaml\n- Source: path\n- Ref: policies.v1.yaml\n- Loaded At: 2024-03-05T12:00:00.000Z\n\n## Lifecycle Timeline\n\n- 2024-03-05T12:00:00.000Z · approval · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · guardrail_check · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · promotion · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · rollback · golden-operator: Rollback to baseline policy after inline promotion.\n- 2024-03-05T12:00:00.000Z · simulation · golden-demo: Replay run golden-0029\n- 2024-03-05T12:00:00.000Z · simulation · golden-demo: Replay run golden-0042\n\n## Rollbacks\n\n- Latest rollback: 2024-03-05T12:00:00.000Z · golden-operator\n- From: 42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594 → To: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Rationale: Rollback to baseline policy after inline promotion.\n\n## Guardrail Checks\n\n- Total Checks: 1\n- Latest Check: 2024-03-05T12:00:00.000Z · golden-operator\n- Latest Decision Allowed: No\n\n## Approvals\n\n- Total Approvals: 1\n\n## Drift Report\n\n- Health State: CRITICAL\n- Recent Window: 2024-02-27T12:00:00.000Z → 2024-03-05T12:00:00.000Z\n- Baseline Window: 2024-01-28T12:00:00.000Z → 2024-02-27T12:00:00.000Z\n\n## Impact Simulation Summary\n\n- Evaluated At: 2024-03-05T12:00:00.000Z\n- Candidate Policy Hash: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Blast Radius Score: 0\n- Intents Evaluated: 12\n\n## Determinism Verification\n\n- Verified: No\n- Event Count: 33\n- Last Event Hash: ed0a4fff308c509069e07921093f84ebae36f8d1c2d3b501b3aaab64a81ef636\n- Drift Window (Recent): 2024-02-27T12:00:00.000Z → 2024-03-05T12:00:00.000Z\n- Drift Window (Baseline): 2024-01-28T12:00:00.000Z → 2024-02-27T12:00:00.000Z",
+  "responses": {
+    "intents": [
+      {
+        "action": "fetchInventory",
+        "executionMode": "manual",
+        "intent": "supplychain.inventory.lookup",
+        "parsedIntent": {
+          "confidence": 0.74,
+          "entities": {
+            "quantity": 2,
+            "sku": "BLOCKED-SKU-2"
+          },
+          "intentType": "CHECK_INVENTORY",
+          "rawText": "Check inventory for sku BLOCKED-SKU-2"
+        },
+        "plan": {
+          "action": "fetchInventory",
+          "intent": "supplychain.inventory.lookup"
+        },
+        "policy": {
+          "categories": [
+            "compliance",
+            "ops"
+          ],
+          "executionMode": "manual",
+          "final": "DENY",
+          "matchedRules": [
+            {
+              "constraintTypes": [
+                "SKU_BLOCKLIST"
+              ],
+              "decision": "DENY",
+              "priority": 80,
+              "reason": "SKU is on the blocklist.",
+              "ruleId": "blocked-sku",
+              "tags": [
+                "compliance",
+                "ops"
+              ]
+            }
+          ],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [
+            {
+              "decision": "DENY",
+              "reason": "SKU is on the blocklist.",
+              "ruleId": "blocked-sku"
+            }
+          ],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-004"
+      },
+      {
+        "action": "fetchInventory",
+        "executionMode": "manual",
+        "intent": "supplychain.inventory.lookup",
+        "parsedIntent": {
+          "confidence": 0.74,
+          "entities": {
+            "quantity": 2,
+            "sku": "SKU-ALPHA"
+          },
+          "intentType": "CHECK_INVENTORY",
+          "rawText": "Check inventory for sku SKU-ALPHA qty 2"
+        },
+        "plan": {
+          "action": "fetchInventory",
+          "intent": "supplychain.inventory.lookup"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-003"
+      },
+      {
+        "action": "fetchInventory",
+        "executionMode": "manual",
+        "intent": "supplychain.inventory.lookup",
+        "parsedIntent": {
+          "confidence": 0.74,
+          "entities": {
+            "quantity": 20,
+            "sku": "SKU-GAMMA"
+          },
+          "intentType": "CHECK_INVENTORY",
+          "rawText": "Check inventory for sku SKU-GAMMA qty 20"
+        },
+        "plan": {
+          "action": "fetchInventory",
+          "intent": "supplychain.inventory.lookup"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-011"
+      },
+      {
+        "action": "fetchInventory",
+        "executionMode": "manual",
+        "intent": "supplychain.inventory.lookup",
+        "parsedIntent": {
+          "confidence": 0.74,
+          "entities": {
+            "quantity": 9,
+            "sku": "SKU-BETA"
+          },
+          "intentType": "CHECK_INVENTORY",
+          "rawText": "Check inventory stock for sku SKU-BETA qty 9"
+        },
+        "plan": {
+          "action": "fetchInventory",
+          "intent": "supplychain.inventory.lookup"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-008"
+      },
+      {
+        "action": "requestInvoiceReview",
+        "executionMode": "manual",
+        "intent": "finance.invoice.review",
+        "parsedIntent": {
+          "confidence": 0.78,
+          "entities": {
+            "amount": 1000,
+            "invoiceId": "INV-888",
+            "quantity": 888
+          },
+          "intentType": "REVIEW_INVOICE",
+          "rawText": "Review invoice INV-888 amount 1000"
+        },
+        "plan": {
+          "action": "requestInvoiceReview",
+          "intent": "finance.invoice.review"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-012"
+      },
+      {
+        "action": "requestInvoiceReview",
+        "executionMode": "manual",
+        "intent": "finance.invoice.review",
+        "parsedIntent": {
+          "confidence": 0.78,
+          "entities": {
+            "amount": 200,
+            "invoiceId": "INV-333",
+            "quantity": 333
+          },
+          "intentType": "REVIEW_INVOICE",
+          "rawText": "Review invoice INV-333 amount 200"
+        },
+        "plan": {
+          "action": "requestInvoiceReview",
+          "intent": "finance.invoice.review"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-009"
+      },
+      {
+        "action": "requestInvoiceReview",
+        "executionMode": "manual",
+        "intent": "finance.invoice.review",
+        "parsedIntent": {
+          "confidence": 0.78,
+          "entities": {
+            "amount": 45000,
+            "invoiceId": "INV-1000",
+            "quantity": 1000
+          },
+          "intentType": "REVIEW_INVOICE",
+          "rawText": "Review invoice INV-1000 amount 45000"
+        },
+        "plan": {
+          "action": "requestInvoiceReview",
+          "intent": "finance.invoice.review"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-005"
+      },
+      {
+        "action": "requestInvoiceReview",
+        "executionMode": "manual",
+        "intent": "finance.invoice.review",
+        "parsedIntent": {
+          "confidence": 0.78,
+          "entities": {
+            "amount": 75000,
+            "invoiceId": "INV-9000",
+            "quantity": 9000
+          },
+          "intentType": "REVIEW_INVOICE",
+          "rawText": "Review invoice INV-9000 amount 75000"
+        },
+        "plan": {
+          "action": "requestInvoiceReview",
+          "intent": "finance.invoice.review"
+        },
+        "policy": {
+          "categories": [
+            "compliance",
+            "finance"
+          ],
+          "executionMode": "manual",
+          "final": "WARN",
+          "matchedRules": [
+            {
+              "constraintTypes": [
+                "MAX_AMOUNT"
+              ],
+              "decision": "WARN",
+              "priority": 90,
+              "reason": "Invoice amount exceeds the auto-review limit.",
+              "ruleId": "max-invoice-amount",
+              "tags": [
+                "compliance",
+                "finance"
+              ]
+            }
+          ],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [
+            {
+              "decision": "WARN",
+              "reason": "Invoice amount exceeds the auto-review limit.",
+              "ruleId": "max-invoice-amount"
+            }
+          ],
+          "requiredApprovals": [
+            {
+              "reason": "Invoice amount exceeds the auto-review limit.",
+              "role": "COMPLIANCE_REVIEWER"
+            },
+            {
+              "reason": "Invoice amount exceeds the auto-review limit.",
+              "role": "FINANCE_REVIEWER"
+            }
+          ],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-006"
+      },
+      {
+        "action": "requestPurchaseOrder",
+        "executionMode": "manual",
+        "intent": "procurement.po.request",
+        "parsedIntent": {
+          "confidence": 0.8,
+          "entities": {
+            "amount": 1200,
+            "quantity": 1200,
+            "sku": "SKU-100",
+            "vendor": "VENDOR-BLUE"
+          },
+          "intentType": "CREATE_PO",
+          "rawText": "Create PO for vendor VENDOR-BLUE amount 1200 sku SKU-100 qty 5"
+        },
+        "plan": {
+          "action": "requestPurchaseOrder",
+          "intent": "procurement.po.request"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "medium",
+            "signals": [
+              {
+                "key": "quantity",
+                "note": "CREATE_PO quantity exceeds 1000 units.",
+                "value": 1200
+              }
+            ]
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-001"
+      },
+      {
+        "action": "requestPurchaseOrder",
+        "executionMode": "manual",
+        "intent": "procurement.po.request",
+        "parsedIntent": {
+          "confidence": 0.8,
+          "entities": {
+            "amount": 2500,
+            "quantity": 2500,
+            "sku": "BLOCKED-SKU-1",
+            "vendor": "VENDOR-RED"
+          },
+          "intentType": "CREATE_PO",
+          "rawText": "Create PO for vendor VENDOR-RED amount 2500 sku BLOCKED-SKU-1 qty 12"
+        },
+        "plan": {
+          "action": "requestPurchaseOrder",
+          "intent": "procurement.po.request"
+        },
+        "policy": {
+          "categories": [
+            "compliance",
+            "ops"
+          ],
+          "executionMode": "manual",
+          "final": "DENY",
+          "matchedRules": [
+            {
+              "constraintTypes": [
+                "SKU_BLOCKLIST"
+              ],
+              "decision": "DENY",
+              "priority": 80,
+              "reason": "SKU is on the blocklist.",
+              "ruleId": "blocked-sku",
+              "tags": [
+                "compliance",
+                "ops"
+              ]
+            },
+            {
+              "constraintTypes": [
+                "VENDOR_BLOCKLIST"
+              ],
+              "decision": "DENY",
+              "priority": 70,
+              "reason": "Vendor is on the blocklist.",
+              "ruleId": "blocked-vendor",
+              "tags": [
+                "compliance"
+              ]
+            }
+          ],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [
+            {
+              "decision": "DENY",
+              "reason": "SKU is on the blocklist.",
+              "ruleId": "blocked-sku"
+            },
+            {
+              "decision": "DENY",
+              "reason": "Vendor is on the blocklist.",
+              "ruleId": "blocked-vendor"
+            }
+          ],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "medium",
+            "signals": [
+              {
+                "key": "quantity",
+                "note": "CREATE_PO quantity exceeds 1000 units.",
+                "value": 2500
+              }
+            ]
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-002"
+      },
+      {
+        "action": "requestPurchaseOrder",
+        "executionMode": "manual",
+        "intent": "procurement.po.request",
+        "parsedIntent": {
+          "confidence": 0.8,
+          "entities": {
+            "amount": 300,
+            "quantity": 300,
+            "sku": "SKU-123",
+            "vendor": "VENDOR-ORANGE"
+          },
+          "intentType": "CREATE_PO",
+          "rawText": "Create PO for vendor VENDOR-ORANGE amount 300 sku SKU-123 qty 2"
+        },
+        "plan": {
+          "action": "requestPurchaseOrder",
+          "intent": "procurement.po.request"
+        },
+        "policy": {
+          "categories": [
+            "compliance"
+          ],
+          "executionMode": "manual",
+          "final": "DENY",
+          "matchedRules": [
+            {
+              "constraintTypes": [
+                "VENDOR_BLOCKLIST"
+              ],
+              "decision": "DENY",
+              "priority": 70,
+              "reason": "Vendor is on the blocklist.",
+              "ruleId": "blocked-vendor",
+              "tags": [
+                "compliance"
+              ]
+            }
+          ],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [
+            {
+              "decision": "DENY",
+              "reason": "Vendor is on the blocklist.",
+              "ruleId": "blocked-vendor"
+            }
+          ],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-010"
+      },
+      {
+        "action": "requestPurchaseOrder",
+        "executionMode": "manual",
+        "intent": "procurement.po.request",
+        "parsedIntent": {
+          "confidence": 0.8,
+          "entities": {
+            "amount": 800,
+            "quantity": 800,
+            "sku": "SKU-777",
+            "vendor": "VENDOR-GREEN"
+          },
+          "intentType": "CREATE_PO",
+          "rawText": "Create purchase order for vendor VENDOR-GREEN amount 800 sku SKU-777 qty 15"
+        },
+        "plan": {
+          "action": "requestPurchaseOrder",
+          "intent": "procurement.po.request"
+        },
+        "policy": {
+          "categories": [],
+          "executionMode": "manual",
+          "final": "ALLOW",
+          "matchedRules": [],
+          "policy": {
+            "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "loadedAt": "2024-03-05T12:00:00.000Z",
+            "path": "policies.v1.yaml",
+            "version": "v1"
+          },
+          "reasons": [],
+          "requiredApprovals": [],
+          "risk": {
+            "level": "low",
+            "signals": []
+          },
+          "simulationAllowed": false
+        },
+        "traceId": "trace-golden-007"
+      }
+    ],
+    "outcomes": [
+      {
+        "outcome": {
+          "createdAt": "2024-03-05T12:00:00.000Z",
+          "decision": "ALLOW",
+          "humanOverride": false,
+          "id": "golden-0025",
+          "intentType": "CREATE_PO",
+          "notes": "Golden demo success",
+          "observedAt": "2024-03-05T12:00:00.000Z",
+          "outcomeType": "success",
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "severity": 1,
+          "traceId": "trace-golden-001"
+        },
+        "stored": true,
+        "traceId": "trace-trace-golden-001-outcome"
+      },
+      {
+        "outcome": {
+          "createdAt": "2024-03-05T12:00:00.000Z",
+          "decision": "DENY",
+          "humanOverride": false,
+          "id": "golden-0026",
+          "intentType": "CHECK_INVENTORY",
+          "notes": "Golden demo failure",
+          "observedAt": "2024-03-05T12:00:00.000Z",
+          "outcomeType": "failure",
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "severity": 4,
+          "traceId": "trace-golden-004"
+        },
+        "stored": true,
+        "traceId": "trace-trace-golden-004-outcome"
+      },
+      {
+        "outcome": {
+          "createdAt": "2024-03-05T12:00:00.000Z",
+          "decision": "DENY",
+          "humanOverride": true,
+          "id": "golden-0028",
+          "intentType": "CREATE_PO",
+          "notes": "Golden demo rollback",
+          "observedAt": "2024-03-05T12:00:00.000Z",
+          "outcomeType": "rollback",
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "severity": 3,
+          "traceId": "trace-golden-010"
+        },
+        "stored": true,
+        "traceId": "trace-trace-golden-010-outcome"
+      },
+      {
+        "outcome": {
+          "createdAt": "2024-03-05T12:00:00.000Z",
+          "decision": "WARN",
+          "humanOverride": true,
+          "id": "golden-0027",
+          "intentType": "REVIEW_INVOICE",
+          "notes": "Golden demo override",
+          "observedAt": "2024-03-05T12:00:00.000Z",
+          "outcomeType": "override",
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "severity": 2,
+          "traceId": "trace-golden-006"
+        },
+        "stored": true,
+        "traceId": "trace-trace-golden-006-outcome"
+      }
+    ],
+    "policyBlastRadius": {
+      "approvalRateDelta": 0,
+      "baselinePolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "intentsAffected": 0,
+      "outcomes": [
+        {
+          "afterCount": 1,
+          "beforeCount": 1,
+          "delta": 0,
+          "outcomeType": "failure",
+          "severityShift": {
+            "afterAvg": 4,
+            "beforeAvg": 4,
+            "delta": 0
+          }
+        },
+        {
+          "afterCount": 1,
+          "beforeCount": 1,
+          "delta": 0,
+          "outcomeType": "override",
+          "severityShift": {
+            "afterAvg": 2,
+            "beforeAvg": 2,
+            "delta": 0
+          }
+        },
+        {
+          "afterCount": 1,
+          "beforeCount": 1,
+          "delta": 0,
+          "outcomeType": "rollback",
+          "severityShift": {
+            "afterAvg": 3,
+            "beforeAvg": 3,
+            "delta": 0
+          }
+        },
+        {
+          "afterCount": 1,
+          "beforeCount": 1,
+          "delta": 0,
+          "outcomeType": "success",
+          "severityShift": {
+            "afterAvg": 1,
+            "beforeAvg": 1,
+            "delta": 0
+          }
+        }
+      ],
+      "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "rejectionRateDelta": 0,
+      "reportHash": "06562399c08eba655697454a516c15cb58bee97ebee1580f1a652b92ef9ff374",
+      "riskScoreDelta": 0,
+      "traceId": "trace-golden-blast-radius",
+      "tracesAffected": 4,
+      "window": {
+        "since": "2024-03-01T00:00:00.000Z",
+        "until": "2024-03-15T00:00:00.000Z"
+      }
+    },
+    "policyCounterfactual": {
+      "baselinePolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+      "intentsAffected": 0,
+      "outcomes": [
+        {
+          "afterCount": 0,
+          "beforeCount": 0,
+          "delta": 0,
+          "outcomeType": "failure"
+        },
+        {
+          "afterCount": 0,
+          "beforeCount": 0,
+          "delta": 0,
+          "outcomeType": "override"
+        },
+        {
+          "afterCount": 0,
+          "beforeCount": 0,
+          "delta": 0,
+          "outcomeType": "rollback"
+        },
+        {
+          "afterCount": 0,
+          "beforeCount": 0,
+          "delta": 0,
+          "outcomeType": "success"
+        }
+      ],
+      "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "reportHash": "5621fec51bfa3cdcf3de31da282fd4fa01206c51b9b4f5a6f22ecadfb0aa1698",
+      "riskScoreDelta": 0,
+      "traceId": "trace-golden-counterfactual",
+      "tracesAffected": 0,
+      "window": {
+        "since": "2024-03-01T00:00:00.000Z",
+        "until": "2024-03-15T00:00:00.000Z"
+      }
+    },
+    "policyCurrent": {
+      "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "loadedAt": "2024-03-05T12:00:00.000Z",
+      "path": "policies.v1.yaml",
+      "version": "v1"
+    },
+    "policyDrift": {
+      "report": {
+        "baseline": {
+          "metrics": {
+            "failureRate": 0.25,
+            "overrideRate": 0.25,
+            "qualityScore": 66.6667,
+            "replayAdded": 0,
+            "replayRemoved": 0,
+            "totalOutcomes": 4
+          },
+          "window": {
+            "since": "2024-02-07T00:00:00.000Z",
+            "until": "2024-03-08T00:00:00.000Z"
+          }
+        },
+        "deltas": {
+          "failureRateDelta": -0.25,
+          "overrideRateDelta": -0.25,
+          "qualityScoreDelta": -66.6667,
+          "replayDelta": 0
+        },
+        "health": {
+          "rationale": [
+            "qualityScore < 60 (0.0000)"
+          ],
+          "state": "CRITICAL"
+        },
+        "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+        "recent": {
+          "metrics": {
+            "failureRate": 0,
+            "overrideRate": 0,
+            "qualityScore": 0,
+            "replayAdded": 0,
+            "replayRemoved": 0,
+            "totalOutcomes": 0
+          },
+          "window": {
+            "since": "2024-03-08T00:00:00.000Z",
+            "until": "2024-03-15T00:00:00.000Z"
+          }
+        }
+      },
+      "traceId": "trace-golden-drift"
+    },
+    "policyEvents": {
+      "events": [],
+      "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "traceId": "trace-golden-events"
+    },
+    "policyImpact": {
+      "blastRadiusScore": 17,
+      "policyHashCandidate": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+      "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "rows": [
+        {
+          "classifications": [
+            "APPROVAL_RELAXED",
+            "NEWLY_BLOCKED",
+            "SEVERITY_INCREASED"
+          ],
+          "intentId": "trace-golden-006",
+          "intentType": "REVIEW_INVOICE",
+          "nextApprovalsRequired": [],
+          "nextDecision": "DENY",
+          "nextSeverity": 2,
+          "prevApprovalsRequired": [
+            "COMPLIANCE_REVIEWER",
+            "FINANCE_REVIEWER"
+          ],
+          "prevDecision": "WARN",
+          "prevSeverity": 1,
+          "traceId": "trace-golden-006"
+        },
+        {
+          "classifications": [
+            "NEWLY_ALLOWED",
+            "SEVERITY_DECREASED"
+          ],
+          "intentId": "trace-golden-002",
+          "intentType": "CREATE_PO",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "DENY",
+          "prevSeverity": 2,
+          "traceId": "trace-golden-002"
+        },
+        {
+          "classifications": [
+            "NEWLY_ALLOWED",
+            "SEVERITY_DECREASED"
+          ],
+          "intentId": "trace-golden-004",
+          "intentType": "CHECK_INVENTORY",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "DENY",
+          "prevSeverity": 2,
+          "traceId": "trace-golden-004"
+        },
+        {
+          "classifications": [
+            "NEWLY_ALLOWED",
+            "SEVERITY_DECREASED"
+          ],
+          "intentId": "trace-golden-010",
+          "intentType": "CREATE_PO",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "DENY",
+          "prevSeverity": 2,
+          "traceId": "trace-golden-010"
+        },
+        {
+          "classifications": [
+            "NEWLY_BLOCKED",
+            "SEVERITY_INCREASED"
+          ],
+          "intentId": "trace-golden-005",
+          "intentType": "REVIEW_INVOICE",
+          "nextApprovalsRequired": [],
+          "nextDecision": "DENY",
+          "nextSeverity": 2,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-005"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-001",
+          "intentType": "CREATE_PO",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-001"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-003",
+          "intentType": "CHECK_INVENTORY",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-003"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-007",
+          "intentType": "CREATE_PO",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-007"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-008",
+          "intentType": "CHECK_INVENTORY",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-008"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-009",
+          "intentType": "REVIEW_INVOICE",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-009"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-011",
+          "intentType": "CHECK_INVENTORY",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-011"
+        },
+        {
+          "classifications": [
+            "UNCHANGED"
+          ],
+          "intentId": "trace-golden-012",
+          "intentType": "REVIEW_INVOICE",
+          "nextApprovalsRequired": [],
+          "nextDecision": "ALLOW",
+          "nextSeverity": 0,
+          "prevApprovalsRequired": [],
+          "prevDecision": "ALLOW",
+          "prevSeverity": 0,
+          "traceId": "trace-golden-012"
+        }
+      ],
+      "totals": {
+        "approvalEscalations": 0,
+        "intentsEvaluated": 12,
+        "newlyAllowed": 3,
+        "newlyBlocked": 2,
+        "severityIncreases": 2
+      },
+      "traceId": "trace-golden-impact",
+      "window": {
+        "since": "2024-03-01T00:00:00.000Z",
+        "until": "2024-03-15T00:00:00.000Z"
+      }
+    },
+    "policyProvenance": {
+      "report": {
+        "approvals": [
+          {
+            "acceptedRiskScore": 0.4,
+            "approvedAt": "2024-03-05T12:00:00.000Z",
+            "approvedBy": "golden-operator",
+            "createdAt": "2024-03-05T12:00:00.000Z",
+            "id": "golden-0069",
+            "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "rationale": "Golden demo promotion for baseline policy.",
+            "runId": "golden-0042"
+          }
+        ],
+        "asOf": "2024-03-05T12:00:00.000Z",
+        "counterfactualReportHash": "5621fec51bfa3cdcf3de31da282fd4fa01206c51b9b4f5a6f22ecadfb0aa1698",
+        "determinism": {
+          "eventCount": 33,
+          "lastEventHash": "ed0a4fff308c509069e07921093f84ebae36f8d1c2d3b501b3aaab64a81ef636",
+          "mismatches": [
+            {
+              "actual": {
+                "events": [
+                  {
+                    "actor": "golden-demo",
+                    "rationale": "Replay run golden-0029",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "simulation"
+                  },
+                  {
+                    "actor": "golden-demo",
+                    "rationale": "Replay run golden-0042",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "simulation"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "approval"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "guardrail_check"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "promotion"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Rollback to baseline policy after inline promotion.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "rollback"
+                  }
+                ],
+                "state": "ACTIVE"
+              },
+              "expected": {
+                "events": [
+                  {
+                    "actor": "golden-demo",
+                    "rationale": "Replay run golden-0029",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "simulation"
+                  },
+                  {
+                    "actor": "golden-demo",
+                    "rationale": "Replay run golden-0042",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "simulation"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "approval"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "guardrail_check"
+                  },
+                  {
+                    "actor": "golden-operator",
+                    "rationale": "Golden demo promotion for baseline policy.",
+                    "timestamp": "2024-03-05T12:00:00.000Z",
+                    "type": "promotion"
+                  }
+                ],
+                "state": "ACTIVE"
+              },
+              "field": "lifecycle"
+            }
+          ],
+          "verified": false,
+          "windows": {
+            "drift": {
+              "baseline": {
+                "since": "2024-01-28T12:00:00.000Z",
+                "until": "2024-02-27T12:00:00.000Z"
+              },
+              "recent": {
+                "since": "2024-02-27T12:00:00.000Z",
+                "until": "2024-03-05T12:00:00.000Z"
+              }
+            },
+            "quality": null
+          }
+        },
+        "driftReport": {
+          "baseline": {
+            "metrics": {
+              "failureRate": 0,
+              "overrideRate": 0,
+              "qualityScore": 0,
+              "replayAdded": 0,
+              "replayRemoved": 0,
+              "totalOutcomes": 0
+            },
+            "window": {
+              "since": "2024-01-28T12:00:00.000Z",
+              "until": "2024-02-27T12:00:00.000Z"
+            }
+          },
+          "deltas": {
+            "failureRateDelta": 0.25,
+            "overrideRateDelta": 0.25,
+            "qualityScoreDelta": 66.6667,
+            "replayDelta": 0
+          },
+          "health": {
+            "rationale": [
+              "failureRate > 0.20 (0.2500)",
+              "failureRateDelta >= 0.05 (0.2500)",
+              "overrideRate > 0.20 (0.2500)",
+              "overrideRateDelta >= 0.05 (0.2500)",
+              "qualityScore < 80 (66.6667)"
+            ],
+            "state": "CRITICAL"
+          },
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "recent": {
+            "metrics": {
+              "failureRate": 0.25,
+              "overrideRate": 0.25,
+              "qualityScore": 66.6667,
+              "replayAdded": 0,
+              "replayRemoved": 0,
+              "totalOutcomes": 4
+            },
+            "window": {
+              "since": "2024-02-27T12:00:00.000Z",
+              "until": "2024-03-05T12:00:00.000Z"
+            }
+          }
+        },
+        "guardrailChecks": [
+          {
+            "actor": "golden-operator",
+            "createdAt": "2024-03-05T12:00:00.000Z",
+            "decision": {
+              "allowed": false,
+              "reasons": [
+                {
+                  "code": "HEALTH_STATE_TOO_LOW",
+                  "message": "Policy health state is below the minimum allowed for promotion.",
+                  "metric": "CRITICAL",
+                  "threshold": "WATCH"
+                },
+                {
+                  "code": "QUALITY_SCORE_TOO_HIGH",
+                  "message": "Quality score exceeds the promotion limit.",
+                  "metric": 33.3333,
+                  "threshold": 1.5
+                }
+              ],
+              "requiredAcceptance": false,
+              "snapshot": {
+                "drift": {
+                  "baseline": {
+                    "metrics": {
+                      "failureRate": 0,
+                      "overrideRate": 0,
+                      "qualityScore": 0,
+                      "replayAdded": 0,
+                      "replayRemoved": 0,
+                      "totalOutcomes": 0
+                    },
+                    "window": {
+                      "since": "2024-01-28T12:00:00.000Z",
+                      "until": "2024-02-27T12:00:00.000Z"
+                    }
+                  },
+                  "deltas": {
+                    "failureRateDelta": 0.25,
+                    "overrideRateDelta": 0.25,
+                    "qualityScoreDelta": 66.6667,
+                    "replayDelta": 0
+                  },
+                  "health": {
+                    "rationale": [
+                      "failureRate > 0.20 (0.2500)",
+                      "failureRateDelta >= 0.05 (0.2500)",
+                      "overrideRate > 0.20 (0.2500)",
+                      "overrideRateDelta >= 0.05 (0.2500)",
+                      "qualityScore < 80 (66.6667)"
+                    ],
+                    "state": "CRITICAL"
+                  },
+                  "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+                  "recent": {
+                    "metrics": {
+                      "failureRate": 0.25,
+                      "overrideRate": 0.25,
+                      "qualityScore": 66.6667,
+                      "replayAdded": 0,
+                      "replayRemoved": 0,
+                      "totalOutcomes": 4
+                    },
+                    "window": {
+                      "since": "2024-02-27T12:00:00.000Z",
+                      "until": "2024-03-05T12:00:00.000Z"
+                    }
+                  }
+                },
+                "evaluatedAt": "2024-03-05T12:00:00.000Z",
+                "impact": {
+                  "blastRadiusScore": 0,
+                  "impactedIntents": 0,
+                  "policyHashCandidate": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+                  "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+                  "rows": [
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-001",
+                      "intentType": "CREATE_PO",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-001"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-002",
+                      "intentType": "CREATE_PO",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "DENY",
+                      "nextSeverity": 2,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "DENY",
+                      "prevSeverity": 2,
+                      "traceId": "trace-golden-002"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-003",
+                      "intentType": "CHECK_INVENTORY",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-003"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-004",
+                      "intentType": "CHECK_INVENTORY",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "DENY",
+                      "nextSeverity": 2,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "DENY",
+                      "prevSeverity": 2,
+                      "traceId": "trace-golden-004"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-005",
+                      "intentType": "REVIEW_INVOICE",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-005"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-006",
+                      "intentType": "REVIEW_INVOICE",
+                      "nextApprovalsRequired": [
+                        "COMPLIANCE_REVIEWER",
+                        "FINANCE_REVIEWER"
+                      ],
+                      "nextDecision": "WARN",
+                      "nextSeverity": 1,
+                      "prevApprovalsRequired": [
+                        "COMPLIANCE_REVIEWER",
+                        "FINANCE_REVIEWER"
+                      ],
+                      "prevDecision": "WARN",
+                      "prevSeverity": 1,
+                      "traceId": "trace-golden-006"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-007",
+                      "intentType": "CREATE_PO",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-007"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-008",
+                      "intentType": "CHECK_INVENTORY",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-008"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-009",
+                      "intentType": "REVIEW_INVOICE",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-009"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-010",
+                      "intentType": "CREATE_PO",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "DENY",
+                      "nextSeverity": 2,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "DENY",
+                      "prevSeverity": 2,
+                      "traceId": "trace-golden-010"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-011",
+                      "intentType": "CHECK_INVENTORY",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-011"
+                    },
+                    {
+                      "classifications": [
+                        "UNCHANGED"
+                      ],
+                      "intentId": "trace-golden-012",
+                      "intentType": "REVIEW_INVOICE",
+                      "nextApprovalsRequired": [],
+                      "nextDecision": "ALLOW",
+                      "nextSeverity": 0,
+                      "prevApprovalsRequired": [],
+                      "prevDecision": "ALLOW",
+                      "prevSeverity": 0,
+                      "traceId": "trace-golden-012"
+                    }
+                  ],
+                  "totals": {
+                    "approvalEscalations": 0,
+                    "intentsEvaluated": 12,
+                    "newlyAllowed": 0,
+                    "newlyBlocked": 0,
+                    "severityIncreases": 0
+                  },
+                  "window": {
+                    "since": "2024-02-27T12:00:00.000Z",
+                    "until": "2024-03-05T12:00:00.000Z"
+                  }
+                },
+                "lineageHead": null,
+                "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+                "quality": {
+                  "failureRate": 0.25,
+                  "overrideRate": 0.25,
+                  "qualityScore": 66.6667,
+                  "score": 33.3333,
+                  "totalOutcomes": 4,
+                  "weightedPenalty": 20
+                }
+              }
+            },
+            "evaluatedAt": "2024-03-05T12:00:00.000Z",
+            "id": "golden-0070",
+            "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "rationale": "Golden demo promotion for baseline policy."
+          }
+        ],
+        "impactSimulationSummary": {
+          "blastRadiusScore": 0,
+          "evaluatedAt": "2024-03-05T12:00:00.000Z",
+          "policyHashCandidate": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "totals": {
+            "approvalEscalations": 0,
+            "impactedIntents": 0,
+            "intentsEvaluated": 12,
+            "newlyAllowed": 0,
+            "newlyBlocked": 0,
+            "severityIncreases": 0
+          },
+          "window": {
+            "since": "2024-02-27T12:00:00.000Z",
+            "until": "2024-03-05T12:00:00.000Z"
+          }
+        },
+        "lastRollback": {
+          "actor": "golden-operator",
+          "createdAt": "2024-03-05T12:00:00.000Z",
+          "eventHash": "18aa674e83d35b4c3faba5e8f077088becefecaae914fdb0cbec7d54ff0df585",
+          "eventType": "ROLLBACK",
+          "fromPolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+          "rationale": "Rollback to baseline policy after inline promotion.",
+          "toPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+        },
+        "lifecycle": {
+          "events": [
+            {
+              "actor": "golden-demo",
+              "rationale": "Replay run golden-0029",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "simulation"
+            },
+            {
+              "actor": "golden-demo",
+              "rationale": "Replay run golden-0042",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "simulation"
+            },
+            {
+              "actor": "golden-operator",
+              "rationale": "Golden demo promotion for baseline policy.",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "approval"
+            },
+            {
+              "actor": "golden-operator",
+              "rationale": "Golden demo promotion for baseline policy.",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "guardrail_check"
+            },
+            {
+              "actor": "golden-operator",
+              "rationale": "Golden demo promotion for baseline policy.",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "promotion"
+            },
+            {
+              "actor": "golden-operator",
+              "rationale": "Rollback to baseline policy after inline promotion.",
+              "timestamp": "2024-03-05T12:00:00.000Z",
+              "type": "rollback"
+            }
+          ],
+          "state": "ACTIVE"
+        },
+        "metadata": {
+          "inlineYaml": null,
+          "lifecycleState": "active",
+          "loadedAt": "2024-03-05T12:00:00.000Z",
+          "path": "policies.v1.yaml",
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "ref": "policies.v1.yaml",
+          "source": "path",
+          "statusUpdatedAt": "2024-03-05T12:00:00.000Z",
+          "version": "v1"
+        },
+        "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+        "reportHash": "7c521e629ba91447b55d39e4600b2b004e50950fbdef5a64a8caeebb7cae67e4"
+      },
+      "traceId": "trace-golden-provenance"
+    },
+    "policyProvenanceMarkdown": "# Policy Provenance Report\n\n- Policy Hash: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Report Hash: 7c521e629ba91447b55d39e4600b2b004e50950fbdef5a64a8caeebb7cae67e4\n- As Of: 2024-03-05T12:00:00.000Z\n- Lifecycle State: ACTIVE\n- Determinism Verified: No\n- Counterfactual Report Hash: 5621fec51bfa3cdcf3de31da282fd4fa01206c51b9b4f5a6f22ecadfb0aa1698\n\n## Metadata\n\n- Status State: active\n- Status Updated At: 2024-03-05T12:00:00.000Z\n- Version: v1\n- Path: policies.v1.yaml\n- Source: path\n- Ref: policies.v1.yaml\n- Loaded At: 2024-03-05T12:00:00.000Z\n\n## Lifecycle Timeline\n\n- 2024-03-05T12:00:00.000Z · approval · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · guardrail_check · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · promotion · golden-operator: Golden demo promotion for baseline policy.\n- 2024-03-05T12:00:00.000Z · rollback · golden-operator: Rollback to baseline policy after inline promotion.\n- 2024-03-05T12:00:00.000Z · simulation · golden-demo: Replay run golden-0029\n- 2024-03-05T12:00:00.000Z · simulation · golden-demo: Replay run golden-0042\n\n## Rollbacks\n\n- Latest rollback: 2024-03-05T12:00:00.000Z · golden-operator\n- From: 42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594 → To: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Rationale: Rollback to baseline policy after inline promotion.\n\n## Guardrail Checks\n\n- Total Checks: 1\n- Latest Check: 2024-03-05T12:00:00.000Z · golden-operator\n- Latest Decision Allowed: No\n\n## Approvals\n\n- Total Approvals: 1\n\n## Drift Report\n\n- Health State: CRITICAL\n- Recent Window: 2024-02-27T12:00:00.000Z → 2024-03-05T12:00:00.000Z\n- Baseline Window: 2024-01-28T12:00:00.000Z → 2024-02-27T12:00:00.000Z\n\n## Impact Simulation Summary\n\n- Evaluated At: 2024-03-05T12:00:00.000Z\n- Candidate Policy Hash: 9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225\n- Blast Radius Score: 0\n- Intents Evaluated: 12\n\n## Determinism Verification\n\n- Verified: No\n- Event Count: 33\n- Last Event Hash: ed0a4fff308c509069e07921093f84ebae36f8d1c2d3b501b3aaab64a81ef636\n- Drift Window (Recent): 2024-02-27T12:00:00.000Z → 2024-03-05T12:00:00.000Z\n- Drift Window (Baseline): 2024-01-28T12:00:00.000Z → 2024-02-27T12:00:00.000Z",
+    "policyQuality": {
+      "metrics": {
+        "failureRate": 0.25,
+        "overrideRate": 0.25,
+        "qualityScore": 66.6667,
+        "totalOutcomes": 4,
+        "weightedPenalty": 20
+      },
+      "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "traceId": "trace-golden-quality",
+      "window": {
+        "since": "2024-03-01T00:00:00.000Z",
+        "until": "2024-03-15T00:00:00.000Z"
+      }
+    },
+    "policyVerify": {
+      "eventCount": 0,
+      "lastEventHash": null,
+      "mismatches": [
+        {
+          "actual": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "expected": null,
+          "field": "activePolicyHash"
+        },
+        {
+          "actual": {
+            "events": [],
+            "state": "ACTIVE"
+          },
+          "expected": {
+            "events": [],
+            "state": "DRAFT"
+          },
+          "field": "lifecycle"
+        }
+      ],
+      "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+      "traceId": "trace-golden-verify",
+      "verified": false,
+      "windows": {
+        "drift": {
+          "baseline": {
+            "since": "2024-02-07T00:00:00.000Z",
+            "until": "2024-03-08T00:00:00.000Z"
+          },
+          "recent": {
+            "since": "2024-03-01T00:00:00.000Z",
+            "until": "2024-03-15T00:00:00.000Z"
+          }
+        },
+        "quality": {
+          "since": "2024-03-01T00:00:00.000Z",
+          "until": "2024-03-15T00:00:00.000Z"
+        }
+      }
+    },
+    "promoteCurrent": {
+      "decision": {
+        "allowed": false,
+        "reasons": [
+          {
+            "code": "HEALTH_STATE_TOO_LOW",
+            "message": "Policy health state is below the minimum allowed for promotion.",
+            "metric": "CRITICAL",
+            "threshold": "WATCH"
+          },
+          {
+            "code": "QUALITY_SCORE_TOO_HIGH",
+            "message": "Quality score exceeds the promotion limit.",
+            "metric": 33.3333,
+            "threshold": 1.5
+          }
+        ],
+        "requiredAcceptance": false,
+        "snapshot": {
+          "drift": {
+            "baseline": {
+              "metrics": {
+                "failureRate": 0,
+                "overrideRate": 0,
+                "qualityScore": 0,
+                "replayAdded": 0,
+                "replayRemoved": 0,
+                "totalOutcomes": 0
+              },
+              "window": {
+                "since": "2024-01-28T12:00:00.000Z",
+                "until": "2024-02-27T12:00:00.000Z"
+              }
+            },
+            "deltas": {
+              "failureRateDelta": 0.25,
+              "overrideRateDelta": 0.25,
+              "qualityScoreDelta": 66.6667,
+              "replayDelta": 0
+            },
+            "health": {
+              "rationale": [
+                "failureRate > 0.20 (0.2500)",
+                "failureRateDelta >= 0.05 (0.2500)",
+                "overrideRate > 0.20 (0.2500)",
+                "overrideRateDelta >= 0.05 (0.2500)",
+                "qualityScore < 80 (66.6667)"
+              ],
+              "state": "CRITICAL"
+            },
+            "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "recent": {
+              "metrics": {
+                "failureRate": 0.25,
+                "overrideRate": 0.25,
+                "qualityScore": 66.6667,
+                "replayAdded": 0,
+                "replayRemoved": 0,
+                "totalOutcomes": 4
+              },
+              "window": {
+                "since": "2024-02-27T12:00:00.000Z",
+                "until": "2024-03-05T12:00:00.000Z"
+              }
+            }
+          },
+          "evaluatedAt": "2024-03-05T12:00:00.000Z",
+          "impact": {
+            "blastRadiusScore": 0,
+            "impactedIntents": 0,
+            "policyHashCandidate": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "rows": [
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-001",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-001"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-002",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "DENY",
+                "nextSeverity": 2,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-002"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-003",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-003"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-004",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "DENY",
+                "nextSeverity": 2,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-004"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-005",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-005"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-006",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [
+                  "COMPLIANCE_REVIEWER",
+                  "FINANCE_REVIEWER"
+                ],
+                "nextDecision": "WARN",
+                "nextSeverity": 1,
+                "prevApprovalsRequired": [
+                  "COMPLIANCE_REVIEWER",
+                  "FINANCE_REVIEWER"
+                ],
+                "prevDecision": "WARN",
+                "prevSeverity": 1,
+                "traceId": "trace-golden-006"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-007",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-007"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-008",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-008"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-009",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-009"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-010",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "DENY",
+                "nextSeverity": 2,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-010"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-011",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-011"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-012",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-012"
+              }
+            ],
+            "totals": {
+              "approvalEscalations": 0,
+              "intentsEvaluated": 12,
+              "newlyAllowed": 0,
+              "newlyBlocked": 0,
+              "severityIncreases": 0
+            },
+            "window": {
+              "since": "2024-02-27T12:00:00.000Z",
+              "until": "2024-03-05T12:00:00.000Z"
+            }
+          },
+          "lineageHead": null,
+          "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "quality": {
+            "failureRate": 0.25,
+            "overrideRate": 0.25,
+            "qualityScore": 66.6667,
+            "score": 33.3333,
+            "totalOutcomes": 4,
+            "weightedPenalty": 20
+          }
+        }
+      },
+      "promoted": {
+        "approval": {
+          "acceptedRiskScore": 0.4,
+          "approvedAt": "2024-03-05T12:00:00.000Z",
+          "approvedBy": "golden-operator",
+          "rationale": "Golden demo promotion for baseline policy.",
+          "reason": "Golden demo promotion for baseline policy.",
+          "runId": "golden-0042"
+        },
+        "inlineYaml": null,
+        "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+        "ref": "policies.v1.yaml",
+        "source": "path",
+        "state": "active",
+        "updatedAt": "2024-03-05T12:00:00.000Z"
+      },
+      "traceId": "trace-golden-promote-current"
+    },
+    "promoteInline": {
+      "decision": {
+        "allowed": false,
+        "reasons": [
+          {
+            "code": "HEALTH_STATE_TOO_LOW",
+            "message": "Policy health state is below the minimum allowed for promotion.",
+            "metric": "CRITICAL",
+            "threshold": "WATCH"
+          },
+          {
+            "code": "QUALITY_SCORE_TOO_HIGH",
+            "message": "Quality score exceeds the promotion limit.",
+            "metric": 100,
+            "threshold": 1.5
+          },
+          {
+            "code": "SEVERITY_DELTA_EXCEEDED",
+            "message": "Severity delta exceeds the promotion limit.",
+            "metric": -3,
+            "threshold": 2
+          }
+        ],
+        "requiredAcceptance": false,
+        "snapshot": {
+          "drift": {
+            "baseline": {
+              "metrics": {
+                "failureRate": 0,
+                "overrideRate": 0,
+                "qualityScore": 0,
+                "replayAdded": 0,
+                "replayRemoved": 0,
+                "totalOutcomes": 0
+              },
+              "window": {
+                "since": "2024-01-28T12:00:00.000Z",
+                "until": "2024-02-27T12:00:00.000Z"
+              }
+            },
+            "deltas": {
+              "failureRateDelta": 0,
+              "overrideRateDelta": 0,
+              "qualityScoreDelta": 0,
+              "replayDelta": 4
+            },
+            "health": {
+              "rationale": [
+                "qualityScore < 60 (0.0000)"
+              ],
+              "state": "CRITICAL"
+            },
+            "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+            "recent": {
+              "metrics": {
+                "failureRate": 0,
+                "overrideRate": 0,
+                "qualityScore": 0,
+                "replayAdded": 1,
+                "replayRemoved": 3,
+                "totalOutcomes": 0
+              },
+              "window": {
+                "since": "2024-02-27T12:00:00.000Z",
+                "until": "2024-03-05T12:00:00.000Z"
+              }
+            }
+          },
+          "evaluatedAt": "2024-03-05T12:00:00.000Z",
+          "impact": {
+            "blastRadiusScore": 17,
+            "impactedIntents": 5,
+            "policyHashCandidate": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+            "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "rows": [
+              {
+                "classifications": [
+                  "APPROVAL_RELAXED",
+                  "NEWLY_BLOCKED",
+                  "SEVERITY_INCREASED"
+                ],
+                "intentId": "trace-golden-006",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "DENY",
+                "nextSeverity": 2,
+                "prevApprovalsRequired": [
+                  "COMPLIANCE_REVIEWER",
+                  "FINANCE_REVIEWER"
+                ],
+                "prevDecision": "WARN",
+                "prevSeverity": 1,
+                "traceId": "trace-golden-006"
+              },
+              {
+                "classifications": [
+                  "NEWLY_ALLOWED",
+                  "SEVERITY_DECREASED"
+                ],
+                "intentId": "trace-golden-002",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-002"
+              },
+              {
+                "classifications": [
+                  "NEWLY_ALLOWED",
+                  "SEVERITY_DECREASED"
+                ],
+                "intentId": "trace-golden-004",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-004"
+              },
+              {
+                "classifications": [
+                  "NEWLY_ALLOWED",
+                  "SEVERITY_DECREASED"
+                ],
+                "intentId": "trace-golden-010",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "DENY",
+                "prevSeverity": 2,
+                "traceId": "trace-golden-010"
+              },
+              {
+                "classifications": [
+                  "NEWLY_BLOCKED",
+                  "SEVERITY_INCREASED"
+                ],
+                "intentId": "trace-golden-005",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "DENY",
+                "nextSeverity": 2,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-005"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-001",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-001"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-003",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-003"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-007",
+                "intentType": "CREATE_PO",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-007"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-008",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-008"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-009",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-009"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-011",
+                "intentType": "CHECK_INVENTORY",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-011"
+              },
+              {
+                "classifications": [
+                  "UNCHANGED"
+                ],
+                "intentId": "trace-golden-012",
+                "intentType": "REVIEW_INVOICE",
+                "nextApprovalsRequired": [],
+                "nextDecision": "ALLOW",
+                "nextSeverity": 0,
+                "prevApprovalsRequired": [],
+                "prevDecision": "ALLOW",
+                "prevSeverity": 0,
+                "traceId": "trace-golden-012"
+              }
+            ],
+            "totals": {
+              "approvalEscalations": 0,
+              "intentsEvaluated": 12,
+              "newlyAllowed": 3,
+              "newlyBlocked": 2,
+              "severityIncreases": 2
+            },
+            "window": {
+              "since": "2024-02-27T12:00:00.000Z",
+              "until": "2024-03-05T12:00:00.000Z"
+            }
+          },
+          "lineageHead": null,
+          "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+          "quality": {
+            "failureRate": 0,
+            "overrideRate": 0,
+            "qualityScore": 0,
+            "score": 100,
+            "totalOutcomes": 0,
+            "weightedPenalty": 0
+          }
+        }
+      },
+      "promoted": {
+        "approval": {
+          "acceptedRiskScore": 0.9,
+          "approvedAt": "2024-03-05T12:00:00.000Z",
+          "approvedBy": "golden-operator",
+          "rationale": "Golden demo promotion for inline candidate.",
+          "reason": "Golden demo promotion for inline candidate.",
+          "runId": "golden-0055"
+        },
+        "inlineYaml": "version: \"v1\"\ndefaults:\n  confidenceThreshold: 0.7\n  execution:\n    autoRequires: [\"WARN\"]\nrules:\n  - id: \"inline-max-invoice-amount\"\n    enabled: true\n    priority: 95\n    appliesTo:\n      intentTypes: [\"REVIEW_INVOICE\"]\n    constraints:\n      - type: \"MAX_AMOUNT\"\n        params:\n          max: 25000\n    decision: \"DENY\"\n    reason: \"Inline policy caps invoice auto-review.\"\n    tags: [\"finance\", \"guardrail\"]\n  - id: \"inline-blocked-vendor\"\n    enabled: true\n    priority: 85\n    appliesTo:\n      intentTypes: [\"CREATE_PO\"]\n    constraints:\n      - type: \"VENDOR_BLOCKLIST\"\n        params:\n          vendors: [\"VENDOR-BLACK\"]\n    decision: \"DENY\"\n    reason: \"Inline policy blocks VENDOR-BLACK.\"\n    tags: [\"compliance\"]\n",
+        "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+        "ref": "golden-inline",
+        "source": "inline",
+        "state": "active",
+        "updatedAt": "2024-03-05T12:00:00.000Z"
+      },
+      "traceId": "trace-golden-promote-inline"
+    },
+    "promotionGuardrails": {
+      "allowed": false,
+      "reasons": [
+        {
+          "code": "HEALTH_STATE_TOO_LOW",
+          "message": "Policy health state is below the minimum allowed for promotion.",
+          "metric": "CRITICAL",
+          "threshold": "WATCH"
+        },
+        {
+          "code": "QUALITY_SCORE_TOO_HIGH",
+          "message": "Quality score exceeds the promotion limit.",
+          "metric": 100,
+          "threshold": 1.5
+        },
+        {
+          "code": "SEVERITY_DELTA_EXCEEDED",
+          "message": "Severity delta exceeds the promotion limit.",
+          "metric": -3,
+          "threshold": 2
+        }
+      ],
+      "requiredAcceptance": false,
+      "snapshot": {
+        "drift": {
+          "baseline": {
+            "metrics": {
+              "failureRate": 0,
+              "overrideRate": 0,
+              "qualityScore": 0,
+              "replayAdded": 0,
+              "replayRemoved": 0,
+              "totalOutcomes": 0
+            },
+            "window": {
+              "since": "2024-01-28T12:00:00.000Z",
+              "until": "2024-02-27T12:00:00.000Z"
+            }
+          },
+          "deltas": {
+            "failureRateDelta": 0,
+            "overrideRateDelta": 0,
+            "qualityScoreDelta": 0,
+            "replayDelta": 4
+          },
+          "health": {
+            "rationale": [
+              "qualityScore < 60 (0.0000)"
+            ],
+            "state": "CRITICAL"
+          },
+          "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+          "recent": {
+            "metrics": {
+              "failureRate": 0,
+              "overrideRate": 0,
+              "qualityScore": 0,
+              "replayAdded": 1,
+              "replayRemoved": 3,
+              "totalOutcomes": 0
+            },
+            "window": {
+              "since": "2024-02-27T12:00:00.000Z",
+              "until": "2024-03-05T12:00:00.000Z"
+            }
+          }
+        },
+        "evaluatedAt": "2024-03-05T12:00:00.000Z",
+        "impact": {
+          "blastRadiusScore": 17,
+          "impactedIntents": 5,
+          "policyHashCandidate": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+          "policyHashCurrent": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+          "rows": [
+            {
+              "classifications": [
+                "APPROVAL_RELAXED",
+                "NEWLY_BLOCKED",
+                "SEVERITY_INCREASED"
+              ],
+              "intentId": "trace-golden-006",
+              "intentType": "REVIEW_INVOICE",
+              "nextApprovalsRequired": [],
+              "nextDecision": "DENY",
+              "nextSeverity": 2,
+              "prevApprovalsRequired": [
+                "COMPLIANCE_REVIEWER",
+                "FINANCE_REVIEWER"
+              ],
+              "prevDecision": "WARN",
+              "prevSeverity": 1,
+              "traceId": "trace-golden-006"
+            },
+            {
+              "classifications": [
+                "NEWLY_ALLOWED",
+                "SEVERITY_DECREASED"
+              ],
+              "intentId": "trace-golden-002",
+              "intentType": "CREATE_PO",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "DENY",
+              "prevSeverity": 2,
+              "traceId": "trace-golden-002"
+            },
+            {
+              "classifications": [
+                "NEWLY_ALLOWED",
+                "SEVERITY_DECREASED"
+              ],
+              "intentId": "trace-golden-004",
+              "intentType": "CHECK_INVENTORY",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "DENY",
+              "prevSeverity": 2,
+              "traceId": "trace-golden-004"
+            },
+            {
+              "classifications": [
+                "NEWLY_ALLOWED",
+                "SEVERITY_DECREASED"
+              ],
+              "intentId": "trace-golden-010",
+              "intentType": "CREATE_PO",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "DENY",
+              "prevSeverity": 2,
+              "traceId": "trace-golden-010"
+            },
+            {
+              "classifications": [
+                "NEWLY_BLOCKED",
+                "SEVERITY_INCREASED"
+              ],
+              "intentId": "trace-golden-005",
+              "intentType": "REVIEW_INVOICE",
+              "nextApprovalsRequired": [],
+              "nextDecision": "DENY",
+              "nextSeverity": 2,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-005"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-001",
+              "intentType": "CREATE_PO",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-001"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-003",
+              "intentType": "CHECK_INVENTORY",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-003"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-007",
+              "intentType": "CREATE_PO",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-007"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-008",
+              "intentType": "CHECK_INVENTORY",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-008"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-009",
+              "intentType": "REVIEW_INVOICE",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-009"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-011",
+              "intentType": "CHECK_INVENTORY",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-011"
+            },
+            {
+              "classifications": [
+                "UNCHANGED"
+              ],
+              "intentId": "trace-golden-012",
+              "intentType": "REVIEW_INVOICE",
+              "nextApprovalsRequired": [],
+              "nextDecision": "ALLOW",
+              "nextSeverity": 0,
+              "prevApprovalsRequired": [],
+              "prevDecision": "ALLOW",
+              "prevSeverity": 0,
+              "traceId": "trace-golden-012"
+            }
+          ],
+          "totals": {
+            "approvalEscalations": 0,
+            "intentsEvaluated": 12,
+            "newlyAllowed": 3,
+            "newlyBlocked": 2,
+            "severityIncreases": 2
+          },
+          "window": {
+            "since": "2024-02-27T12:00:00.000Z",
+            "until": "2024-03-05T12:00:00.000Z"
+          }
+        },
+        "lineageHead": null,
+        "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+        "quality": {
+          "failureRate": 0,
+          "overrideRate": 0,
+          "qualityScore": 0,
+          "score": 100,
+          "totalOutcomes": 0,
+          "weightedPenalty": 0
+        }
+      },
+      "traceId": "trace-golden-promote-check"
+    },
+    "reconcile": {
+      "report": {
+        "fromPolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+        "reportHash": "1b5bd054c3bdacee46a4848ecf2b2d3e99ac74af2ca0659d94715c6d7816f62a",
+        "rulesAdded": [
+          {
+            "approvalRoles": [
+              "COMPLIANCE_REVIEWER",
+              "FINANCE_REVIEWER"
+            ],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "REVIEW_INVOICE"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "max": 50000
+                  },
+                  "type": "MAX_AMOUNT"
+                }
+              ],
+              "decision": "WARN",
+              "enabled": true,
+              "id": "max-invoice-amount",
+              "priority": 90,
+              "reason": "Invoice amount exceeds the auto-review limit.",
+              "tags": [
+                "compliance",
+                "finance"
+              ]
+            },
+            "ruleId": "max-invoice-amount"
+          },
+          {
+            "approvalRoles": [
+              "OPS_REVIEWER",
+              "SAFETY_REVIEWER"
+            ],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CREATE_PO"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "max": 3,
+                    "windowSeconds": 60
+                  },
+                  "type": "RATE_LIMIT"
+                }
+              ],
+              "decision": "WARN",
+              "enabled": true,
+              "id": "auto-requires-rate-limit",
+              "priority": 60,
+              "reason": "Rate limit reached for similar purchase order requests.",
+              "tags": [
+                "ops",
+                "safety"
+              ]
+            },
+            "ruleId": "auto-requires-rate-limit"
+          },
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CHECK_INVENTORY",
+                  "CREATE_PO",
+                  "REVIEW_INVOICE"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "min": 0.5
+                  },
+                  "type": "CONFIDENCE_MIN"
+                }
+              ],
+              "decision": "DENY",
+              "enabled": true,
+              "id": "confidence-minimum",
+              "priority": 100,
+              "reason": "Intent confidence is below the minimum required threshold.",
+              "tags": [
+                "compliance"
+              ]
+            },
+            "ruleId": "confidence-minimum"
+          },
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CHECK_INVENTORY",
+                  "CREATE_PO",
+                  "REVIEW_INVOICE"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "mode": "simulate"
+                  },
+                  "type": "EXECUTION_MODE"
+                }
+              ],
+              "decision": "ALLOW",
+              "enabled": true,
+              "id": "simulate-override",
+              "priority": 10,
+              "reason": "Simulation mode is always permitted.",
+              "tags": [
+                "dev",
+                "simulation"
+              ]
+            },
+            "ruleId": "simulate-override"
+          },
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CHECK_INVENTORY",
+                  "CREATE_PO"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "skus": [
+                      "BLOCKED-SKU-1",
+                      "BLOCKED-SKU-2"
+                    ]
+                  },
+                  "type": "SKU_BLOCKLIST"
+                }
+              ],
+              "decision": "DENY",
+              "enabled": true,
+              "id": "blocked-sku",
+              "priority": 80,
+              "reason": "SKU is on the blocklist.",
+              "tags": [
+                "compliance",
+                "ops"
+              ]
+            },
+            "ruleId": "blocked-sku"
+          },
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CREATE_PO"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "vendors": [
+                      "VENDOR-ORANGE",
+                      "VENDOR-RED"
+                    ]
+                  },
+                  "type": "VENDOR_BLOCKLIST"
+                }
+              ],
+              "decision": "DENY",
+              "enabled": true,
+              "id": "blocked-vendor",
+              "priority": 70,
+              "reason": "Vendor is on the blocklist.",
+              "tags": [
+                "compliance"
+              ]
+            },
+            "ruleId": "blocked-vendor"
+          }
+        ],
+        "rulesModified": [],
+        "rulesRemoved": [
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "CREATE_PO"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "vendors": [
+                      "VENDOR-BLACK"
+                    ]
+                  },
+                  "type": "VENDOR_BLOCKLIST"
+                }
+              ],
+              "decision": "DENY",
+              "enabled": true,
+              "id": "inline-blocked-vendor",
+              "priority": 85,
+              "reason": "Inline policy blocks VENDOR-BLACK.",
+              "tags": [
+                "compliance"
+              ]
+            },
+            "ruleId": "inline-blocked-vendor"
+          },
+          {
+            "approvalRoles": [],
+            "rule": {
+              "appliesTo": {
+                "intentTypes": [
+                  "REVIEW_INVOICE"
+                ]
+              },
+              "constraints": [
+                {
+                  "params": {
+                    "max": 25000
+                  },
+                  "type": "MAX_AMOUNT"
+                }
+              ],
+              "decision": "DENY",
+              "enabled": true,
+              "id": "inline-max-invoice-amount",
+              "priority": 95,
+              "reason": "Inline policy caps invoice auto-review.",
+              "tags": [
+                "finance",
+                "guardrail"
+              ]
+            },
+            "ruleId": "inline-max-invoice-amount"
+          }
+        ],
+        "summary": {
+          "approvalsAdded": [
+            "COMPLIANCE_REVIEWER",
+            "FINANCE_REVIEWER",
+            "OPS_REVIEWER",
+            "SAFETY_REVIEWER"
+          ],
+          "approvalsRemoved": [],
+          "autoExecutionApprovalsChanged": false,
+          "defaultsChanged": true,
+          "rulesAdded": 6,
+          "rulesModified": 0,
+          "rulesRemoved": 2
+        },
+        "toPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+      },
+      "traceId": "trace-golden-reconcile"
+    },
+    "replay": {
+      "reports": {
+        "current": {
+          "byIntentType": [
+            {
+              "baseline": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "CREATE_PO"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 0,
+                "warn": 1
+              },
+              "candidate": {
+                "allow": 3,
+                "deny": 0,
+                "warn": 1
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "REVIEW_INVOICE"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 1,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 3,
+                "deny": 1,
+                "warn": 0
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "CHECK_INVENTORY"
+            }
+          ],
+          "deltas": {
+            "allowDelta": 0,
+            "denyDelta": 0,
+            "warnDelta": 0
+          },
+          "impact": {
+            "blocked": false,
+            "counts": {
+              "changedDecisions": 0,
+              "denyToAllowFlips": 0,
+              "highRiskSignals": 0,
+              "rateLimitViolations": 0
+            },
+            "exceeded": [],
+            "score": 0,
+            "thresholds": {
+              "changedDecisions": 25,
+              "denyToAllowFlips": 3,
+              "highRiskSignals": 10,
+              "rateLimitViolations": 5,
+              "score": 100
+            },
+            "weights": {
+              "changedDecisions": 1,
+              "denyToAllowFlips": 5,
+              "highRiskSignals": 2,
+              "rateLimitViolations": 3
+            }
+          },
+          "outcomeOverlay": {
+            "metrics": {
+              "failureRate": 0.25,
+              "overrideRate": 0.25,
+              "qualityScore": 66.6667,
+              "totalOutcomes": 4,
+              "weightedPenalty": 20
+            },
+            "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "window": {
+              "since": "2024-02-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            }
+          },
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+              "ref": "policies.v1.yaml",
+              "source": "current"
+            },
+            "createdAt": "2024-03-05T12:00:00.000Z",
+            "filters": {
+              "limit": 50,
+              "since": "2024-03-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            },
+            "runId": "golden-0029"
+          },
+          "topChangedExamples": [],
+          "topRuleChanges": [],
+          "totals": {
+            "baseline": {
+              "allow": 8,
+              "deny": 3,
+              "warn": 1
+            },
+            "candidate": {
+              "allow": 8,
+              "deny": 3,
+              "warn": 1
+            },
+            "changed": 0,
+            "count": 12,
+            "unchanged": 12
+          },
+          "traceId": "trace-golden-replay-report-current"
+        },
+        "inline": {
+          "byIntentType": [
+            {
+              "baseline": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 4,
+                "deny": 0,
+                "warn": 0
+              },
+              "changed": 2,
+              "count": 4,
+              "intentType": "CREATE_PO"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 0,
+                "warn": 1
+              },
+              "candidate": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "changed": 2,
+              "count": 4,
+              "intentType": "REVIEW_INVOICE"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 1,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 4,
+                "deny": 0,
+                "warn": 0
+              },
+              "changed": 1,
+              "count": 4,
+              "intentType": "CHECK_INVENTORY"
+            }
+          ],
+          "deltas": {
+            "allowDelta": 2,
+            "denyDelta": -1,
+            "warnDelta": -1
+          },
+          "impact": {
+            "blocked": false,
+            "counts": {
+              "changedDecisions": 5,
+              "denyToAllowFlips": 3,
+              "highRiskSignals": 0,
+              "rateLimitViolations": 0
+            },
+            "exceeded": [],
+            "score": 20,
+            "thresholds": {
+              "changedDecisions": 25,
+              "denyToAllowFlips": 3,
+              "highRiskSignals": 10,
+              "rateLimitViolations": 5,
+              "score": 100
+            },
+            "weights": {
+              "changedDecisions": 1,
+              "denyToAllowFlips": 5,
+              "highRiskSignals": 2,
+              "rateLimitViolations": 3
+            }
+          },
+          "outcomeOverlay": {
+            "metrics": {
+              "failureRate": 0,
+              "overrideRate": 0,
+              "qualityScore": 0,
+              "totalOutcomes": 0,
+              "weightedPenalty": 0
+            },
+            "policyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+            "window": {
+              "since": "2024-02-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            }
+          },
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+              "ref": "golden-inline",
+              "source": "inline"
+            },
+            "createdAt": "2024-03-05T12:00:00.000Z",
+            "filters": {
+              "limit": 50,
+              "since": "2024-03-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            },
+            "runId": "golden-0055"
+          },
+          "topChangedExamples": [
+            {
+              "baselineDecision": "ALLOW",
+              "baselineRules": [],
+              "candidateDecision": "DENY",
+              "candidateRules": [
+                "inline-max-invoice-amount"
+              ],
+              "intentType": "REVIEW_INVOICE",
+              "traceId": "trace-golden-005"
+            },
+            {
+              "baselineDecision": "DENY",
+              "baselineRules": [
+                "blocked-sku",
+                "blocked-vendor"
+              ],
+              "candidateDecision": "ALLOW",
+              "candidateRules": [],
+              "intentType": "CREATE_PO",
+              "traceId": "trace-golden-002"
+            },
+            {
+              "baselineDecision": "DENY",
+              "baselineRules": [
+                "blocked-sku"
+              ],
+              "candidateDecision": "ALLOW",
+              "candidateRules": [],
+              "intentType": "CHECK_INVENTORY",
+              "traceId": "trace-golden-004"
+            },
+            {
+              "baselineDecision": "DENY",
+              "baselineRules": [
+                "blocked-vendor"
+              ],
+              "candidateDecision": "ALLOW",
+              "candidateRules": [],
+              "intentType": "CREATE_PO",
+              "traceId": "trace-golden-010"
+            },
+            {
+              "baselineDecision": "WARN",
+              "baselineRules": [
+                "max-invoice-amount"
+              ],
+              "candidateDecision": "DENY",
+              "candidateRules": [
+                "inline-max-invoice-amount"
+              ],
+              "intentType": "REVIEW_INVOICE",
+              "traceId": "trace-golden-006"
+            }
+          ],
+          "topRuleChanges": [
+            {
+              "changedCount": 1,
+              "direction": "more_strict",
+              "examples": [
+                {
+                  "baselineDecision": "WARN",
+                  "candidateDecision": "DENY",
+                  "traceId": "trace-golden-006"
+                }
+              ],
+              "ruleId": "max-invoice-amount"
+            },
+            {
+              "changedCount": 2,
+              "direction": "less_strict",
+              "examples": [
+                {
+                  "baselineDecision": "DENY",
+                  "candidateDecision": "ALLOW",
+                  "traceId": "trace-golden-002"
+                },
+                {
+                  "baselineDecision": "DENY",
+                  "candidateDecision": "ALLOW",
+                  "traceId": "trace-golden-004"
+                }
+              ],
+              "ruleId": "blocked-sku"
+            },
+            {
+              "changedCount": 2,
+              "direction": "less_strict",
+              "examples": [
+                {
+                  "baselineDecision": "DENY",
+                  "candidateDecision": "ALLOW",
+                  "traceId": "trace-golden-002"
+                },
+                {
+                  "baselineDecision": "DENY",
+                  "candidateDecision": "ALLOW",
+                  "traceId": "trace-golden-010"
+                }
+              ],
+              "ruleId": "blocked-vendor"
+            },
+            {
+              "changedCount": 2,
+              "direction": "more_strict",
+              "examples": [
+                {
+                  "baselineDecision": "ALLOW",
+                  "candidateDecision": "DENY",
+                  "traceId": "trace-golden-005"
+                },
+                {
+                  "baselineDecision": "WARN",
+                  "candidateDecision": "DENY",
+                  "traceId": "trace-golden-006"
+                }
+              ],
+              "ruleId": "inline-max-invoice-amount"
+            }
+          ],
+          "totals": {
+            "baseline": {
+              "allow": 8,
+              "deny": 3,
+              "warn": 1
+            },
+            "candidate": {
+              "allow": 10,
+              "deny": 2,
+              "warn": 0
+            },
+            "changed": 5,
+            "count": 12,
+            "unchanged": 7
+          },
+          "traceId": "trace-golden-replay-report-inline"
+        },
+        "path": {
+          "byIntentType": [
+            {
+              "baseline": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 2,
+                "deny": 2,
+                "warn": 0
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "CREATE_PO"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 0,
+                "warn": 1
+              },
+              "candidate": {
+                "allow": 3,
+                "deny": 0,
+                "warn": 1
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "REVIEW_INVOICE"
+            },
+            {
+              "baseline": {
+                "allow": 3,
+                "deny": 1,
+                "warn": 0
+              },
+              "candidate": {
+                "allow": 3,
+                "deny": 1,
+                "warn": 0
+              },
+              "changed": 0,
+              "count": 4,
+              "intentType": "CHECK_INVENTORY"
+            }
+          ],
+          "deltas": {
+            "allowDelta": 0,
+            "denyDelta": 0,
+            "warnDelta": 0
+          },
+          "impact": {
+            "blocked": false,
+            "counts": {
+              "changedDecisions": 0,
+              "denyToAllowFlips": 0,
+              "highRiskSignals": 0,
+              "rateLimitViolations": 0
+            },
+            "exceeded": [],
+            "score": 0,
+            "thresholds": {
+              "changedDecisions": 25,
+              "denyToAllowFlips": 3,
+              "highRiskSignals": 10,
+              "rateLimitViolations": 5,
+              "score": 100
+            },
+            "weights": {
+              "changedDecisions": 1,
+              "denyToAllowFlips": 5,
+              "highRiskSignals": 2,
+              "rateLimitViolations": 3
+            }
+          },
+          "outcomeOverlay": {
+            "metrics": {
+              "failureRate": 0.25,
+              "overrideRate": 0.25,
+              "qualityScore": 66.6667,
+              "totalOutcomes": 4,
+              "weightedPenalty": 20
+            },
+            "policyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+            "window": {
+              "since": "2024-02-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            }
+          },
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+              "ref": "policies.v1.yaml",
+              "source": "path"
+            },
+            "createdAt": "2024-03-05T12:00:00.000Z",
+            "filters": {
+              "limit": 50,
+              "since": "2024-03-01T00:00:00.000Z",
+              "until": "2024-03-15T00:00:00.000Z"
+            },
+            "runId": "golden-0042"
+          },
+          "topChangedExamples": [],
+          "topRuleChanges": [],
+          "totals": {
+            "baseline": {
+              "allow": 8,
+              "deny": 3,
+              "warn": 1
+            },
+            "candidate": {
+              "allow": 8,
+              "deny": 3,
+              "warn": 1
+            },
+            "changed": 0,
+            "count": 12,
+            "unchanged": 12
+          },
+          "traceId": "trace-golden-replay-report-path"
+        }
+      },
+      "runs": {
+        "current": {
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+              "ref": "policies.v1.yaml",
+              "source": "current"
+            },
+            "changedExamples": [],
+            "runId": "golden-0029",
+            "totals": {
+              "allow": 8,
+              "changed": 0,
+              "count": 12,
+              "deny": 3,
+              "warn": 1
+            }
+          },
+          "traceId": "trace-golden-replay-current"
+        },
+        "inline": {
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+              "ref": "golden-inline",
+              "source": "inline"
+            },
+            "changedExamples": [
+              {
+                "baselineDecision": "ALLOW",
+                "candidateDecision": "DENY",
+                "intentType": "REVIEW_INVOICE",
+                "rulesChanged": {
+                  "added": [
+                    "inline-max-invoice-amount"
+                  ],
+                  "removed": []
+                },
+                "traceId": "trace-golden-005"
+              },
+              {
+                "baselineDecision": "DENY",
+                "candidateDecision": "ALLOW",
+                "intentType": "CHECK_INVENTORY",
+                "rulesChanged": {
+                  "added": [],
+                  "removed": [
+                    "blocked-sku"
+                  ]
+                },
+                "traceId": "trace-golden-004"
+              },
+              {
+                "baselineDecision": "DENY",
+                "candidateDecision": "ALLOW",
+                "intentType": "CREATE_PO",
+                "rulesChanged": {
+                  "added": [],
+                  "removed": [
+                    "blocked-sku",
+                    "blocked-vendor"
+                  ]
+                },
+                "traceId": "trace-golden-002"
+              },
+              {
+                "baselineDecision": "DENY",
+                "candidateDecision": "ALLOW",
+                "intentType": "CREATE_PO",
+                "rulesChanged": {
+                  "added": [],
+                  "removed": [
+                    "blocked-vendor"
+                  ]
+                },
+                "traceId": "trace-golden-010"
+              },
+              {
+                "baselineDecision": "WARN",
+                "candidateDecision": "DENY",
+                "intentType": "REVIEW_INVOICE",
+                "rulesChanged": {
+                  "added": [
+                    "inline-max-invoice-amount"
+                  ],
+                  "removed": [
+                    "max-invoice-amount"
+                  ]
+                },
+                "traceId": "trace-golden-006"
+              }
+            ],
+            "runId": "golden-0055",
+            "totals": {
+              "allow": 10,
+              "changed": 5,
+              "count": 12,
+              "deny": 2,
+              "warn": 0
+            }
+          },
+          "traceId": "trace-golden-replay-inline"
+        },
+        "path": {
+          "run": {
+            "baseline": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+            },
+            "candidate": {
+              "hash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225",
+              "ref": "policies.v1.yaml",
+              "source": "path"
+            },
+            "changedExamples": [],
+            "runId": "golden-0042",
+            "totals": {
+              "allow": 8,
+              "changed": 0,
+              "count": 12,
+              "deny": 3,
+              "warn": 1
+            }
+          },
+          "traceId": "trace-golden-replay-path"
+        }
+      }
+    },
+    "rollback": {
+      "decision": {
+        "createdAt": "2024-03-05T12:00:00.000Z",
+        "decisionHash": "4118b0193e4f8f1570f3453e7780d681d5797c7d695fef0c93bfd207fa443515",
+        "fromPolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+        "ok": true,
+        "reasons": [],
+        "toPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+      },
+      "event": {
+        "actor": "golden-operator",
+        "createdAt": "2024-03-05T12:00:00.000Z",
+        "eventHash": "18aa674e83d35b4c3faba5e8f077088becefecaae914fdb0cbec7d54ff0df585",
+        "eventType": "ROLLBACK",
+        "fromPolicyHash": "42f6026c7eaa4968b3fdc7b48681e42c3f24274082734384500424a64ee90594",
+        "rationale": "Rollback to baseline policy after inline promotion.",
+        "toPolicyHash": "9f463fbebbddbc50b7587a04a8d527290342edc0e7c7e2301ccc7b174f239225"
+      },
+      "traceId": "trace-golden-rollback"
+    }
+  }
+}

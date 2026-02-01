@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { config } from "../config";
 import type { PolicyPromotionInput, PolicyPromotionRecord } from "./types";
+import { generateId, now } from "../testing/determinism";
 
 export type PolicyPromotionStore = {
   createPromotion: (input: PolicyPromotionInput) => Promise<PolicyPromotionRecord>;
@@ -13,8 +14,8 @@ export class InMemoryPolicyPromotionStore implements PolicyPromotionStore {
 
   async createPromotion(input: PolicyPromotionInput): Promise<PolicyPromotionRecord> {
     const record: PolicyPromotionRecord = {
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
+      id: generateId(),
+      createdAt: now().toISOString(),
       ...input
     };
     this.records.push(record);

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { config } from "../config";
 import type { PolicyApprovalInput, PolicyApprovalRecord } from "./types";
+import { generateId, now } from "../testing/determinism";
 
 export type PolicyApprovalStore = {
   recordApproval: (input: PolicyApprovalInput) => Promise<PolicyApprovalRecord>;
@@ -13,8 +14,8 @@ export class InMemoryPolicyApprovalStore implements PolicyApprovalStore {
 
   async recordApproval(input: PolicyApprovalInput): Promise<PolicyApprovalRecord> {
     const record: PolicyApprovalRecord = {
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
+      id: generateId(),
+      createdAt: now().toISOString(),
       ...input
     };
     this.records.push(record);
